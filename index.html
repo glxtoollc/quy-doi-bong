@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Galaxy Football Team</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Quỹ Đội Bóng">
+<meta name="theme-color" content="#1B5E20">
+<style>
+  :root{
+    --primary:#1B5E20; --primary-light:#2E7D32;
+    --credit:#2E7D32; --debit:#C62828; --warning:#F9A825; --danger:#C62828;
+    --bg:#FAFAFA; --card-border:#ECECEC; --text-main:#1A1A1A; --text-sub:#757575;
+  }
+  body.theme-pitch{--primary:#1B5E20;--primary-light:#2E7D32;--credit:#2E7D32;--theme-a:#0B5D2A;--theme-b:#147033;}
+  body.theme-night{--primary:#1565C0;--primary-light:#42A5F5;--credit:#1565C0;--theme-a:#071B3A;--theme-b:#0D47A1;}
+  body.theme-stadium{--primary:#6A1B9A;--primary-light:#AB47BC;--credit:#6A1B9A;--theme-a:#24103A;--theme-b:#5B176E;}
+  body.theme-sunset{--primary:#E65100;--primary-light:#FF8A50;--credit:#E65100;--theme-a:#5A2108;--theme-b:#A8430B;}
+  body.theme-classic{--primary:#00695C;--primary-light:#26A69A;--credit:#00695C;--theme-a:#063B35;--theme-b:#00796B;}
+  body.theme-neon{--primary:#7B1FA2;--primary-light:#E040FB;--credit:#7B1FA2;--theme-a:#160021;--theme-b:#4A0A5E;}
+  body{--theme-a:#0B5D2A;--theme-b:#147033;}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; min-height:100%; background:#0B5D2A;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--text-main); -webkit-font-smoothing:antialiased; overscroll-behavior:none;}
+  body{position:relative; overflow-x:hidden;
+    background:
+      linear-gradient(135deg, var(--theme-a), var(--theme-b)),
+      repeating-linear-gradient(0deg, transparent 0 78px, rgba(255,255,255,.045) 79px 80px),
+      repeating-linear-gradient(90deg, transparent 0 78px, rgba(255,255,255,.045) 79px 80px);}
+  body::before{content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.16;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420' viewBox='0 0 420 420'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='2'%3E%3Crect x='35' y='35' width='350' height='350' rx='18'/%3E%3Ccircle cx='210' cy='210' r='58'/%3E%3Cpath d='M210 35v350M35 210h350'/%3E%3Crect x='35' y='145' width='72' height='130'/%3E%3Crect x='313' y='145' width='72' height='130'/%3E%3C/g%3E%3Cg fill='%23ffffff'%3E%3Ccircle cx='72' cy='72' r='17'/%3E%3Ccircle cx='348' cy='348' r='13'/%3E%3C/g%3E%3Cg fill='%230B5D2A'%3E%3Cpath d='M72 59l5 8 9 3-6 7 1 10-9-4-9 4 1-10-6-7 9-3z'/%3E%3Cpath d='M348 338l4 6 7 2-5 5 1 8-7-3-7 3 1-8-5-5 7-2z'/%3E%3C/g%3E%3C/svg%3E");
+    background-size:420px 420px; background-position:center;}
+  /* Mỗi giao diện có họa tiết sân/bóng riêng, không chỉ đổi màu */
+  body.theme-night::before{opacity:.18;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.35' stroke-width='2'%3E%3Cpath d='M0 315 Q105 250 210 315 T420 315'/%3E%3Cpath d='M0 355 Q105 290 210 355 T420 355'/%3E%3C/g%3E%3Cg fill='%23ffffff' fill-opacity='.6'%3E%3Ccircle cx='62' cy='70' r='3'/%3E%3Ccircle cx='160' cy='120' r='2'/%3E%3Ccircle cx='310' cy='75' r='3'/%3E%3Ccircle cx='370' cy='155' r='2'/%3E%3C/g%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='2' stroke-opacity='.22'%3E%3Ccircle cx='210' cy='235' r='58'/%3E%3Cpath d='M152 235h116M210 177v116'/%3E%3C/g%3E%3C/svg%3E");background-size:420px 420px;}
+  body.theme-stadium::before{opacity:.16;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='2' stroke-opacity='.28'%3E%3Cpath d='M20 330 Q210 120 400 330'/%3E%3Cpath d='M55 365 Q210 190 365 365'/%3E%3Crect x='165' y='250' width='90' height='70' rx='8'/%3E%3Cpath d='M180 320v-38h60v38'/%3E%3C/g%3E%3Cg fill='%23ffffff' fill-opacity='.32'%3E%3Ccircle cx='45' cy='80' r='10'/%3E%3Ccircle cx='82' cy='72' r='8'/%3E%3Ccircle cx='338' cy='74' r='9'/%3E%3Ccircle cx='374' cy='83' r='11'/%3E%3C/g%3E%3C/svg%3E");background-size:420px 420px;}
+  body.theme-sunset::before{opacity:.18;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='2' stroke-opacity='.25'%3E%3Crect x='40' y='65' width='340' height='290' rx='16'/%3E%3Ccircle cx='210' cy='210' r='58'/%3E%3Cpath d='M40 210h340M210 65v290'/%3E%3Cpath d='M40 145h65v130H40M380 145h-65v130h65'/%3E%3C/g%3E%3Cg fill='%23ffffff' fill-opacity='.55'%3E%3Ccircle cx='340' cy='90' r='22'/%3E%3Cpath d='M74 75l7 13 15 3-11 10 2 15-13-7-14 7 3-15-11-10 15-3z'/%3E%3C/g%3E%3C/svg%3E");background-size:420px 420px;}
+  body.theme-classic::before{opacity:.16;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='2' stroke-opacity='.2'%3E%3Ccircle cx='70' cy='75' r='28'/%3E%3Ccircle cx='350' cy='120' r='24'/%3E%3Ccircle cx='105' cy='325' r='24'/%3E%3Ccircle cx='325' cy='335' r='30'/%3E%3C/g%3E%3Cg fill='%23ffffff' fill-opacity='.18'%3E%3Cpath d='M70 51l9 14 16 5-11 12 2 16-16-7-15 7 3-16-12-12 17-5z'/%3E%3Cpath d='M350 98l8 12 14 4-10 10 2 14-14-6-13 6 3-14-10-10 14-4z'/%3E%3Cpath d='M105 303l8 12 14 4-10 10 2 14-14-6-13 6 3-14-10-10 14-4z'/%3E%3C/g%3E%3C/svg%3E");background-size:420px 420px;}
+  body.theme-neon::before{opacity:.2;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cg fill='none' stroke='%23E040FB' stroke-width='2' stroke-opacity='.35'%3E%3Cpath d='M25 80h370M25 210h370M25 340h370'/%3E%3Cpath d='M80 25v370M210 25v370M340 25v370'/%3E%3Ccircle cx='210' cy='210' r='65'/%3E%3C/g%3E%3Cg fill='none' stroke='%23ffffff' stroke-opacity='.25'%3E%3Cpath d='M170 170l40-20 40 20v45l-40 25-40-25z'/%3E%3C/g%3E%3C/svg%3E");background-size:420px 420px;}
+  #app{position:relative; z-index:1; max-width:520px; margin:0 auto; min-height:100vh; padding-bottom:calc(84px + env(safe-area-inset-bottom,0px));}
+  .topbar{display:flex; align-items:center; justify-content:space-between;
+    padding:calc(env(safe-area-inset-top,0px) + 16px) 20px 12px 20px;}
+  .topbar h1{font-size:19px; margin:0; font-weight:700;}
+  .icon-btn{width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:transparent; border:none; cursor:pointer; color:var(--text-main); flex-shrink:0;}
+  .icon-btn:active{background:#00000010;}
+  .view{padding:0 20px 24px 20px; animation:fadeIn .2s ease;}
+  @keyframes fadeIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+
+  .banner{display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:14px; margin-bottom:14px; font-weight:600; font-size:13px;}
+  .banner.warning{background:#F9A82526; color:#B8860B; border:1px solid #F9A82580;}
+  .banner.danger{background:#C6282526; color:var(--danger); border:1px solid #C6282580;}
+
+  .card{background:#fff; border:1px solid var(--card-border); border-radius:16px; padding:16px; margin-bottom:12px;}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .row + .row{margin-top:10px;}
+
+  .member-row{display:flex; align-items:center; justify-content:space-between; padding:14px; border:1px solid var(--card-border);
+    border-radius:14px; margin-bottom:10px; background:#fff;}
+  .member-row .name{font-weight:600; font-size:15px;}
+  .member-row.inactive{opacity:.58; background:#F3F3F3;}
+  .member-row.inactive .name, .member-row.inactive .sub{color:#8A8A8A;}
+  .member-actions{position:relative; flex-shrink:0; display:flex; align-items:center; gap:10px;}
+  .member-more{width:34px; height:34px; border:none; border-radius:50%; background:transparent; color:#666; font-size:22px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;}
+  .member-more:active{background:#00000010;}
+  .member-row .sub{font-size:12px; color:var(--text-sub); margin-top:2px;}
+  .balance-tag{font-weight:700; font-size:15px;}
+  .balance-ok{color:var(--credit);}
+  .balance-warn{color:#B8860B;}
+  .balance-danger{color:var(--danger);}
+
+  .fab{position:fixed; right:20px; bottom:calc(84px + env(safe-area-inset-bottom,0px)); width:56px; height:56px;
+    border-radius:50%; background:var(--primary); color:#fff; border:none; font-size:28px; box-shadow:0 4px 14px #1B5E2055;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:40; max-width:520px;}
+  .fab:active{transform:scale(.95);}
+
+  .btn{border:none; border-radius:12px; padding:13px 18px; font-weight:700; font-size:15px; cursor:pointer;}
+  .btn-primary{background:var(--primary); color:#fff; width:100%;}
+  .btn-outline{background:#fff; color:var(--primary); border:1.5px solid var(--primary);}
+  .btn-danger-outline{background:#fff; color:var(--danger); border:1.5px solid var(--danger);}
+  .btn-sm{padding:8px 14px; font-size:13px; border-radius:10px;}
+  .btn-block{width:100%;}
+  .btn-row{display:flex; gap:10px; margin-top:14px;}
+  .btn-row .btn{flex:1;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:13px; color:var(--text-sub); margin-bottom:6px; font-weight:600;}
+  .field input, .field select{width:100%; padding:13px; border-radius:12px; border:1px solid #DDD; font-size:16px; background:#fff; color:var(--text-main);}
+  .field input:focus, .field select:focus{outline:none; border-color:var(--primary);}
+  .time-picker{position:relative;flex:1;min-width:0;}
+  .time-picker-btn{width:100%;padding:13px;border-radius:12px;border:1px solid #DDD;background:#fff;color:var(--text-main);font-size:16px;text-align:left;cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
+  .time-picker-btn:focus{outline:none;border-color:var(--primary);}
+  .time-picker-menu{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:45;background:#fff;border:1px solid #DDD;border-radius:12px;box-shadow:0 8px 24px #00000018;max-height:260px;overflow:auto;padding:5px;}
+  .time-picker-menu[hidden]{display:none;}
+  .time-picker-option{width:100%;border:0;background:#fff;padding:11px 12px;border-radius:9px;text-align:left;font-size:15px;cursor:pointer;}
+  .time-picker-option:active,.time-picker-option:hover{background:#F1F5F1;color:var(--primary);}
+  .time-picker-option.other{font-weight:800;color:var(--primary);border-top:1px solid #EEE;margin-top:4px;padding-top:12px;}
+  .section-title{font-weight:700; font-size:15px; margin:18px 0 10px 0;}
+  .settings-compact-card{padding:14px;}
+  .settings-value input{width:88px;text-align:center;padding:10px;border:1px solid #DDD;border-radius:10px;font-size:16px;font-weight:700;}
+  .about-card{padding:6px 14px;}
+  .about-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #EEE;font-size:14px;}
+  .about-row:last-child{border-bottom:0;}
+  .about-row span{color:var(--text-sub);}
+  .about-row strong{font-weight:700;}
+  .hint{font-size:12px; color:var(--text-sub); margin-top:4px;}
+
+  .chip{display:inline-flex; align-items:center; gap:6px; padding:9px 14px; border-radius:20px; border:1.5px solid #DDD;
+    background:#fff; font-size:13px; font-weight:600; cursor:pointer; color:var(--text-main); margin:0 8px 8px 0;}
+  .chip.active{background:var(--primary); border-color:var(--primary); color:#fff;}
+  .chip-row{display:flex; flex-wrap:wrap;}
+
+  .confirm-card{background:linear-gradient(135deg,#E8F5E9,#F7FFF8); border:2px solid #66BB6A; box-shadow:0 6px 20px #1B5E2026; position:relative; overflow:hidden;}
+  .confirm-card::before{content:""; position:absolute; inset:0 auto 0 0; width:5px; background:#1B8E3E;}
+  .confirm-title{display:flex; align-items:center; gap:8px; font-size:16px; font-weight:800; color:#145A26; margin-bottom:7px;}
+  .confirm-icon{width:28px; height:28px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; background:#1B8E3E; color:#fff; box-shadow:0 3px 8px #1B8E3E44;}
+  .btn-confirm-highlight{background:linear-gradient(135deg,#B71C1C,#8E0000); color:#FFB74D; border:2px solid #FF9800; box-shadow:0 8px 22px #8E000055, inset 0 1px 0 #ffffff22; font-size:16px; padding:15px 18px; text-shadow:0 1px 1px #00000055; letter-spacing:.1px;}
+  .btn-orange-action{background:linear-gradient(135deg,#FF9800,#F57C00); color:#fff; border:2px solid #FFB300; box-shadow:0 7px 18px #F57C0038, inset 0 1px 0 #ffffff33; font-weight:800;}
+  .btn-orange-action:active{transform:translateY(1px); box-shadow:0 3px 10px #F57C0038;}
+  .btn-confirm-highlight:active{transform:translateY(1px) scale(.995); box-shadow:0 4px 12px #8E000048;}
+
+  .settings-compact-card{padding:13px 14px;}
+  .settings-inline{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .settings-copy{min-width:0;flex:1;}
+  .settings-label{font-size:14px;font-weight:700;margin-bottom:3px;}
+  .settings-value{display:flex;align-items:center;gap:5px;flex-shrink:0;}
+  .settings-value input{width:108px;padding:9px 10px;border:1px solid #DDD;border-radius:10px;font-size:14px;text-align:right;}
+  .settings-value span{font-size:11px;color:var(--text-sub);font-weight:700;}
+  .settings-save-btn{margin-top:10px;width:100%;padding:10px 14px;}
+  .settings-badge{font-size:11px;font-weight:800;color:#777;background:#F1F1F1;border-radius:999px;padding:6px 9px;white-space:nowrap;}
+
+  .add-row{display:flex; align-items:center; justify-content:space-between; padding:10px 4px; border-bottom:1px solid var(--card-border);}
+  .add-row:last-child{border-bottom:none;}
+  .plus-btn{width:32px; height:32px; border-radius:50%; border:none; background:var(--primary); color:#fff; font-size:18px; cursor:pointer; flex-shrink:0;}
+  .minus-btn{width:32px; height:32px; border-radius:50%; border:none; background:#EEE; color:var(--debit); font-size:18px; cursor:pointer; flex-shrink:0;}
+
+  .team-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .team-card{background:#fff;border:1px solid var(--card-border);border-radius:16px;padding:12px;min-width:0;}
+  .team-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-weight:800;font-size:14px;}
+  .team-card-header .add-team-btn{border:1px solid var(--primary);background:#fff;color:var(--primary);border-radius:9px;padding:6px 9px;font-size:12px;font-weight:800;cursor:pointer;}
+  .team-player{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 0;border-bottom:1px solid var(--card-border);font-size:13px;}
+  .team-player:last-child{border-bottom:none;}
+  .team-player .remove-player{border:none;background:#F3F3F3;color:var(--danger);width:24px;height:24px;border-radius:50%;font-size:16px;line-height:20px;cursor:pointer;flex-shrink:0;}
+  .picker-row{display:flex;align-items:center;justify-content:space-between;padding:12px 4px;border-bottom:1px solid var(--card-border);cursor:pointer;}
+  .picker-row:last-child{border-bottom:none;}
+  .picker-row:active{background:#F5F5F5;}
+  .picker-row .picker-add{color:var(--primary);font-weight:800;}
+  .participant-row{display:flex; align-items:center; justify-content:space-between; padding:10px 4px; border-bottom:1px solid var(--card-border); gap:8px;}
+  .participant-row:last-child{border-bottom:none;}
+  .participant-name{font-weight:600; font-size:14px; flex:1;}
+  .badge{font-size:11px; padding:2px 8px; border-radius:8px; background:#EEE; color:var(--text-sub); font-weight:600;}
+  .badge-guest{background:#607D8B22; color:#546E7A;}
+  .badge-paid{background:#2E7D3222; color:var(--credit);}
+  .badge-unpaid{background:#F9A82522; color:#B8860B;}
+  .team-toggle{display:flex; border-radius:10px; overflow:hidden; border:1px solid #DDD; flex-shrink:0;}
+  .team-toggle button{border:none; background:#fff; padding:7px 10px; font-size:12px; font-weight:700; cursor:pointer; color:var(--text-sub);}
+  .team-toggle button.active{background:var(--primary); color:#fff;}
+
+  .status-badge{font-size:11px; padding:3px 10px; border-radius:10px; font-weight:700;}
+  .status-draft{background:#90A4AE22; color:#546E7A;}
+  .status-completed{background:#2E7D3222; color:var(--credit);}
+  .status-cancelled{background:#C6282522; color:var(--danger); text-decoration:line-through;}
+
+  .match-row{padding:14px; border:1px solid var(--card-border); border-radius:14px; margin-bottom:10px; background:#fff; cursor:pointer;}
+  .match-row .top{display:flex; justify-content:space-between; align-items:center;}
+  .match-row .title{font-weight:700; font-size:14px;}
+  .match-row .meta{font-size:12px; color:var(--text-sub); margin-top:4px;}
+
+  .result-header{background:linear-gradient(135deg, var(--primary), var(--primary-light)); border-radius:18px; padding:20px; color:#fff; margin-bottom:16px;}
+  .result-header .loc{font-size:14px; opacity:.9; margin-top:4px;}
+  .result-header .fee{font-size:22px; font-weight:800; margin-top:10px;}
+  .team-block{margin-bottom:14px;}
+  .team-block h3{font-size:14px; margin:0 0 8px 0; display:flex; align-items:center; gap:6px;}
+  .team-block h3.winner::after{content:"🏆"; }
+  .person-line{display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--card-border); font-size:14px;}
+  .person-line:last-child{border-bottom:none;}
+  .total-line{display:flex; justify-content:space-between; padding:12px 0 0 0; font-weight:700; font-size:15px;}
+
+  .empty-state{text-align:center; color:var(--text-sub); padding:50px 20px; font-size:14px;}
+
+  .overlay{position:fixed; inset:0; background:#00000055; z-index:60; display:none; align-items:flex-end; justify-content:center;}
+  .overlay.active{display:flex;}
+  .overlay.center{align-items:center;}
+  .sheet{background:#fff; width:100%; max-width:520px; border-radius:22px 22px 0 0; padding:20px 20px calc(26px + env(safe-area-inset-bottom,0px)) 20px; animation:slideUp .2s ease; max-height:85vh; overflow-y:auto;}
+  @keyframes slideUp{from{transform:translateY(30px); opacity:0;} to{transform:translateY(0); opacity:1;}}
+  .sheet h3{margin:0 0 14px 0; font-size:17px;}
+  .dialog{background:#fff; border-radius:18px; padding:22px 20px; width:85%; max-width:360px; animation:slideUp .2s ease;}
+  .dialog h3{margin:0 0 8px 0; font-size:16px;}
+  .dialog p{margin:0 0 18px 0; color:var(--text-sub); font-size:14px; line-height:1.5; white-space:pre-line;}
+  .dialog-actions{display:flex; gap:10px; justify-content:flex-end;}
+  .dialog-actions button{padding:10px 18px; border-radius:10px; border:none; font-weight:600; font-size:14px; cursor:pointer;}
+  .btn-cancel{background:transparent; color:var(--text-sub);}
+  .btn-confirm{background:var(--primary); color:#fff;}
+  .btn-confirm.danger{background:var(--danger);}
+
+  #snackbar{position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%) translateY(80px);
+    background:#212121; color:#fff; padding:13px 20px; border-radius:12px; font-size:14px; z-index:100; opacity:0; transition:all .25s ease; max-width:90%; text-align:center;}
+  #snackbar.show{transform:translateX(-50%) translateY(0); opacity:1;}
+
+  #bottom-tabbar{position:fixed; left:0; right:0; bottom:0; z-index:50; display:flex;
+    background:#fff; border-top:1px solid var(--card-border);
+    padding-bottom:env(safe-area-inset-bottom,0px); margin:0 auto; max-width:520px;}
+  .tab-item{flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    background:none; border:none; padding:9px 4px 8px 4px; cursor:pointer; color:var(--text-sub);}
+  .tab-item svg{width:22px; height:22px;}
+  .tab-item span{font-size:11px; font-weight:600;}
+  .tab-item.active{color:var(--primary);}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div id="bottom-tabbar"></div>
+<div id="snackbar"></div>
+
+<div class="overlay" id="overlay-sheet" onclick="if(event.target===this) Dialogs.closeSheet()"><div class="sheet" id="sheet-content"></div></div>
+<div class="overlay center" id="overlay-dialog" onclick="if(event.target===this) Dialogs.closeDialog()"><div class="dialog" id="dialog-content"></div></div>
+
+<script>
+'use strict';
+/* =========================================================================
+   QUỸ ĐỘI BÓNG — single-file web app
+   Kiến trúc phân lớp trong cùng 1 file (không dùng framework):
+     Storage  -> đọc/ghi localStorage
+     Utils    -> format tiền, ngày, id
+     Services -> TOÀN BỘ logic nghiệp vụ + tính tiền (UI không tự tính)
+     Views    -> chỉ render HTML & gọi Services
+   ========================================================================= */
+
+/* ---------------------------- STORAGE ---------------------------- */
+const Storage = (() => {
+  const KEY = 'football_team_fund_v1';
+  const SCHEMA_VERSION = 1;
+
+  function defaultState(){
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      members: [],
+      transactions: [],
+      matches: [],
+      settings: {
+        warningThreshold: 200000,
+        theme: 'pitch',
+        savedLocations: [],
+        ratioPresets: [
+          { losingShare: 70, winningShare: 30 },
+          { losingShare: 60, winningShare: 40 },
+          { losingShare: 50, winningShare: 50 },
+          { losingShare: 100, winningShare: 0 },
+        ],
+      },
+    };
+  }
+
+  function load(){
+    try{
+      const raw = localStorage.getItem(KEY);
+      if(!raw) return defaultState();
+      const parsed = JSON.parse(raw);
+      const state = {
+        schemaVersion: parsed.schemaVersion || SCHEMA_VERSION,
+        members: Array.isArray(parsed.members) ? parsed.members : [],
+        transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
+        matches: Array.isArray(parsed.matches) ? parsed.matches : [],
+        settings: {
+          ...defaultState().settings,
+          ...(parsed.settings || {}),
+          savedLocations: Array.isArray(parsed.settings?.savedLocations) ? parsed.settings.savedLocations : [],
+          // Luôn giữ 4 kèo nhanh theo đúng thứ tự yêu cầu, kể cả dữ liệu localStorage cũ.
+          ratioPresets: [
+            { losingShare: 70, winningShare: 30 },
+            { losingShare: 60, winningShare: 40 },
+            { losingShare: 50, winningShare: 50 },
+            { losingShare: 100, winningShare: 0 },
+          ],
+        },
+      };
+      // Bản cũ dùng mặc định 20.000đ. Đổi sang quy ước mới 200 = 200.000đ.
+      if(state.settings.warningThreshold === 20000) state.settings.warningThreshold = 200000;
+      if(!state.settings.theme) state.settings.theme = 'pitch';
+      return state;
+    }catch(e){
+      console.error('Lỗi đọc dữ liệu, dùng mặc định:', e);
+      return defaultState();
+    }
+  }
+
+  let state = load();
+
+  return {
+    get(){ return state; },
+    save(){ localStorage.setItem(KEY, JSON.stringify(state)); },
+    replace(newState){ state = newState; this.save(); },
+    isValidImport(obj){
+      return obj && typeof obj === 'object'
+        && Array.isArray(obj.members) && Array.isArray(obj.transactions) && Array.isArray(obj.matches);
+    },
+  };
+})();
+
+/* ---------------------------- UTILS ---------------------------- */
+const Utils = {
+  genId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); },
+  formatCurrency(amount){ return new Intl.NumberFormat('vi-VN').format(Math.round(amount)) + ' VNĐ'; },
+  formatSigned(amount){
+    const sign = amount >= 0 ? '+' : '-';
+    return sign + new Intl.NumberFormat('vi-VN').format(Math.abs(Math.round(amount))) + ' VNĐ';
+  },
+  roundUpTo1000(amount){ return Math.ceil(amount / 1000) * 1000; },
+  formatDate(iso){
+    const d = new Date(iso);
+    const p = n => String(n).padStart(2, '0');
+    return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()}`;
+  },
+  formatDateTime(iso){
+    const d = new Date(iso);
+    const p = n => String(n).padStart(2, '0');
+    return `${this.formatDate(iso)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  },
+  todayISODate(){ return new Date().toISOString().slice(0,10); },
+  nowTimeHHMM(){
+    const d = new Date();
+    const p = n => String(n).padStart(2, '0');
+    return `${p(d.getHours())}:${p(d.getMinutes())}`;
+  },
+  escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  },
+};
+
+/* ---------------------------- MODELS ---------------------------- */
+const TransactionType = { DEPOSIT:'deposit', MATCH_COST:'match_cost', ADJUSTMENT:'adjustment', REVERSAL:'reversal' };
+const MatchStatus = { DRAFT:'draft', COMPLETED:'completed', CANCELLED:'cancelled' };
+
+/* ---------------------------- SERVICES ---------------------------- */
+
+const MemberService = {
+  list({ includeInactive = false } = {}){
+    const { members } = Storage.get();
+    return includeInactive ? members : members.filter(m => m.status === 'active');
+  },
+  listAll(){ return Storage.get().members; },
+  get(id){ return Storage.get().members.find(m => m.id === id); },
+  add(name){
+    const m = { id: Utils.genId(), name: name.trim(), status: 'active', createdAt: new Date().toISOString() };
+    Storage.get().members.push(m);
+    Storage.save();
+    return m;
+  },
+  rename(id, newName){
+    const m = this.get(id); if(!m) return;
+    m.name = newName.trim();
+    Storage.save();
+  },
+  setStatus(id, status){
+    const m = this.get(id); if(!m) return;
+    m.status = status;
+    Storage.save();
+  },
+  /** Chỉ xóa cứng khi thành viên CHƯA có giao dịch nào (chưa từng nạp tiền / tham gia trận nào đã tính tiền).
+   * Nếu đã có giao dịch, trả về ok:false — nên dùng "Cho nghỉ đội" (setStatus) để giữ lịch sử. */
+  remove(id){
+    const balance = TransactionService.balanceOf(id);
+    if(balance !== 0) return { ok:false, reason:'Chỉ được xóa thành viên khi số dư quỹ đúng bằng 0 VNĐ.' };
+    const state = Storage.get();
+    state.members = state.members.filter(m => m.id !== id);
+    // Giữ nguyên transactions/matches để dữ liệu cũ không bị thay đổi.
+    Storage.save();
+    return { ok:true };
+  },
+};
+
+const TransactionService = {
+  forMember(memberId){
+    return Storage.get().transactions
+      .filter(t => t.memberId === memberId)
+      .sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+  },
+  balanceOf(memberId){
+    return Storage.get().transactions
+      .filter(t => t.memberId === memberId)
+      .reduce((sum, t) => sum + t.amount, 0);
+  },
+  _push(t){ Storage.get().transactions.push(t); Storage.save(); return t; },
+  addDeposit(memberId, amount){
+    return this._push({ id: Utils.genId(), memberId, type: TransactionType.DEPOSIT, amount: Math.abs(amount), matchId: null, note: 'Đóng quỹ', createdAt: new Date().toISOString() });
+  },
+  addAdjustment(memberId, signedAmount, note){
+    return this._push({ id: Utils.genId(), memberId, type: TransactionType.ADJUSTMENT, amount: signedAmount, matchId: null, note: note || 'Điều chỉnh', createdAt: new Date().toISOString() });
+  },
+  getById(txId){ return Storage.get().transactions.find(t => t.id === txId); },
+  /** Sửa số tiền một giao dịch NẠP TIỀN đã tạo trước đó — không sửa đè bản ghi cũ,
+   * mà tạo thêm 1 giao dịch điều chỉnh (chênh lệch) để giữ nguyên lịch sử. */
+  correctDeposit(txId, newAmount){
+    const tx = this.getById(txId); if(!tx || tx.type !== TransactionType.DEPOSIT) return null;
+    const delta = newAmount - tx.amount;
+    if(delta === 0) return null;
+    return this.addAdjustment(tx.memberId, delta, `Sửa nạp quỹ: ${Utils.formatCurrency(tx.amount)} → ${Utils.formatCurrency(newAmount)}`);
+  },
+  /** Hủy hẳn một giao dịch nạp tiền bị nhầm — hoàn lại đúng số tiền, giữ nguyên bản ghi gốc. */
+  cancelDeposit(txId){
+    const tx = this.getById(txId); if(!tx || tx.type !== TransactionType.DEPOSIT) return null;
+    return this.addAdjustment(tx.memberId, -tx.amount, `Hủy giao dịch nạp nhầm ${Utils.formatCurrency(tx.amount)}`);
+  },
+  addMatchCost(memberId, amount, matchId){
+    return this._push({ id: Utils.genId(), memberId, type: TransactionType.MATCH_COST, amount: -Math.abs(amount), matchId, note: 'Chi phí trận đấu', reversed: false, createdAt: new Date().toISOString() });
+  },
+  addReversal(memberId, originalAmount, matchId){
+    return this._push({ id: Utils.genId(), memberId, type: TransactionType.REVERSAL, amount: -originalAmount, matchId, note: 'Hoàn tác trận đấu', createdAt: new Date().toISOString() });
+  },
+  reverseMatch(matchId){
+    // Chỉ hoàn tác những match_cost CHƯA từng được hoàn tác trước đó,
+    // tránh trường hợp sửa trận nhiều lần rồi hủy gây hoàn tiền trùng lặp (double-reversal).
+    const related = Storage.get().transactions.filter(t => t.matchId === matchId && t.type === TransactionType.MATCH_COST && !t.reversed);
+    related.forEach(t => {
+      this.addReversal(t.memberId, t.amount, matchId);
+      t.reversed = true;
+    });
+    Storage.save();
+  },
+};
+
+const MatchService = {
+  list(){ return [...Storage.get().matches].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)); },
+  get(id){ return Storage.get().matches.find(m => m.id === id); },
+
+  createDraft(data){
+    const match = {
+      id: Utils.genId(),
+      date: data.date, time: data.time, location: data.location || '', fieldFee: data.fieldFee || 0,
+      ratio: data.ratio,
+      status: MatchStatus.DRAFT,
+      setupConfirmed: false,
+      participants: [], guests: [], winningTeam: null,
+      perPersonAmounts: [],
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    };
+    Storage.get().matches.push(match);
+    Storage.save();
+    return match;
+  },
+
+  update(id, patch){
+    const match = this.get(id); if(!match) return;
+    Object.assign(match, patch, { updatedAt: new Date().toISOString() });
+    Storage.save();
+    return match;
+  },
+
+  addParticipant(matchId, refType, refId){
+    const match = this.get(matchId); if(!match) return;
+    match.participants = match.participants.filter(p => !(p.refType===refType && p.refId===refId));
+    match.participants.push({ refType, refId, team: 'team2' });
+    match.updatedAt = new Date().toISOString();
+    Storage.save();
+  },
+
+  removeParticipant(matchId, refType, refId){
+    const match = this.get(matchId); if(!match) return;
+    match.participants = match.participants.filter(p => !(p.refType===refType && p.refId===refId));
+    if(refType === 'guest'){ match.guests = match.guests.filter(g => g.id !== refId); }
+    match.updatedAt = new Date().toISOString();
+    Storage.save();
+  },
+
+  addGuest(matchId, name){
+    const match = this.get(matchId); if(!match) return null;
+    const guest = { id: Utils.genId(), name: name.trim(), paid: false };
+    match.guests.push(guest);
+    match.updatedAt = new Date().toISOString();
+    Storage.save();
+    this.addParticipant(matchId, 'guest', guest.id);
+    return guest;
+  },
+
+  setGuestPaid(matchId, guestId, paid){
+    const match = this.get(matchId); if(!match) return;
+    const guest = match.guests.find(g => g.id === guestId);
+    if(guest) guest.paid = paid;
+    Storage.save();
+  },
+
+  setTeam(matchId, refType, refId, team){
+    const match = this.get(matchId); if(!match) return;
+    const p = match.participants.find(p => p.refType===refType && p.refId===refId);
+    if(p) p.team = team;
+    match.updatedAt = new Date().toISOString();
+    Storage.save();
+  },
+
+  /** LOGIC TÍNH TIỀN DUY NHẤT — UI không được tự tính. */
+  calculateCosts(match){
+    const errors = [];
+    if(!match.fieldFee || match.fieldFee <= 0) errors.push('Tiền sân không hợp lệ');
+    if(!match.ratio) errors.push('Chưa chọn tỷ lệ chia');
+    if(!match.winningTeam) errors.push('Chưa chọn đội thắng');
+
+    const teams = { team1: [], team2: [] };
+    match.participants.forEach(p => { if(teams[p.team]) teams[p.team].push(p); });
+
+    if(teams.team1.length === 0 || teams.team2.length === 0){
+      errors.push('Mỗi đội phải có ít nhất 1 người tham gia');
+    }
+    if(errors.length) return { perPersonAmounts: [], totalCollected: 0, errors };
+
+    const winTeam = match.winningTeam;
+    const loseTeam = winTeam === 'team1' ? 'team2' : 'team1';
+    const winCost = Math.round(match.fieldFee * match.ratio.winningShare / 100);
+    const loseCost = Math.round(match.fieldFee * match.ratio.losingShare / 100);
+    const teamCost = { [winTeam]: winCost, [loseTeam]: loseCost };
+
+    const perPersonAmounts = [];
+    let totalCollected = 0;
+
+    for(const teamKey of ['team1','team2']){
+      const officialMembers = teams[teamKey].filter(p => p.refType === 'member');
+      const guestsInTeam = teams[teamKey].filter(p => p.refType === 'guest');
+      const headcount = officialMembers.length + guestsInTeam.length;
+
+      // headcount > 0 đã được đảm bảo ở validate "mỗi đội phải có ít nhất 1 người" phía trên
+      const rawPerPerson = teamCost[teamKey] / headcount;
+      const rounded = Utils.roundUpTo1000(rawPerPerson);
+
+      officialMembers.forEach(p => {
+        perPersonAmounts.push({ refType:'member', refId:p.refId, team:teamKey, amount: rounded });
+        totalCollected += rounded;
+      });
+      guestsInTeam.forEach(g => {
+        // Guest phải đóng số tiền y hệt member, nhưng KHÔNG tạo transaction (không có ví trong app)
+        perPersonAmounts.push({ refType:'guest', refId:g.refId, team:teamKey, amount: rounded });
+        totalCollected += rounded;
+      });
+    }
+
+    if(errors.length) return { perPersonAmounts: [], totalCollected: 0, errors };
+    return { perPersonAmounts, totalCollected, errors: [] };
+  },
+
+  confirm(matchId){
+    const match = this.get(matchId); if(!match) return { ok:false, errors:['Không tìm thấy trận đấu'] };
+    const { perPersonAmounts, errors } = this.calculateCosts(match);
+    if(errors.length) return { ok:false, errors };
+
+    if(match.status === MatchStatus.COMPLETED){
+      TransactionService.reverseMatch(matchId);
+    }
+    perPersonAmounts.forEach(p => {
+      if(p.refType === 'member' && p.amount > 0){
+        TransactionService.addMatchCost(p.refId, p.amount, matchId);
+      }
+    });
+
+    match.perPersonAmounts = perPersonAmounts;
+    match.status = MatchStatus.COMPLETED;
+    match.updatedAt = new Date().toISOString();
+    Storage.save();
+    return { ok:true };
+  },
+
+  cancel(matchId){
+    const match = this.get(matchId); if(!match) return;
+    if(match.status === MatchStatus.COMPLETED){ TransactionService.reverseMatch(matchId); }
+    match.status = MatchStatus.CANCELLED;
+    match.updatedAt = new Date().toISOString();
+    Storage.save();
+  },
+};
+
+/* ---------------------------- DIALOGS (bottom sheet / modal dùng chung) ---------------------------- */
+const Dialogs = {
+  openSheet(html){
+    document.getElementById('sheet-content').innerHTML = html;
+    document.getElementById('overlay-sheet').classList.add('active');
+  },
+  closeSheet(){ document.getElementById('overlay-sheet').classList.remove('active'); },
+
+  openDialog(html){
+    document.getElementById('dialog-content').innerHTML = html;
+    document.getElementById('overlay-dialog').classList.add('active');
+  },
+  closeDialog(){ document.getElementById('overlay-dialog').classList.remove('active'); },
+
+  confirm(message, onYes, danger=false){
+    this.openDialog(`
+      <h3>Xác nhận</h3>
+      <p>${Utils.escapeHtml(message)}</p>
+      <div class="dialog-actions">
+        <button class="btn-cancel" onclick="Dialogs.closeDialog()">Không</button>
+        <button class="btn-confirm ${danger?'danger':''}" id="dlg-yes-btn">Có</button>
+      </div>`);
+    document.getElementById('dlg-yes-btn').onclick = () => { Dialogs.closeDialog(); onYes(); };
+  },
+
+  alert(message){
+    this.openDialog(`
+      <h3>Thông báo</h3>
+      <p>${Utils.escapeHtml(message)}</p>
+      <div class="dialog-actions">
+        <button class="btn-confirm" onclick="Dialogs.closeDialog()">Đã hiểu</button>
+      </div>`);
+  },
+
+  promptAmount(title, onSubmit){
+    this.openSheet(`
+      <h3>${Utils.escapeHtml(title)}</h3>
+      <div class="field">
+        <label>Số tiền đóng quỹ (nghìn VNĐ)</label>
+        <input type="number" id="dlg-amount-input" inputmode="numeric" placeholder="VD: 20 = 20.000 VNĐ">
+      </div>
+      <button class="btn btn-primary" id="dlg-amount-btn">Xác nhận</button>
+    `);
+    document.getElementById('dlg-amount-btn').onclick = () => {
+      const input = parseInt(document.getElementById('dlg-amount-input').value, 10);
+      if(isNaN(input) || input <= 0){ Snackbar.show('Số tiền không hợp lệ'); return; }
+      const val = input * 1000;
+      Dialogs.closeSheet();
+      onSubmit(val);
+    };
+  },
+
+  promptText(title, placeholder, onSubmit){
+    this.openSheet(`
+      <h3>${Utils.escapeHtml(title)}</h3>
+      <div class="field">
+        <input type="text" id="dlg-text-input" placeholder="${Utils.escapeHtml(placeholder)}">
+      </div>
+      <button class="btn btn-primary" id="dlg-text-btn">Xác nhận</button>
+    `);
+    document.getElementById('dlg-text-btn').onclick = () => {
+      const val = document.getElementById('dlg-text-input').value.trim();
+      if(!val){ Snackbar.show('Vui lòng nhập nội dung'); return; }
+      Dialogs.closeSheet();
+      onSubmit(val);
+    };
+  },
+};
+
+const Snackbar = {
+  timer: null,
+  show(message){
+    const el = document.getElementById('snackbar');
+    el.textContent = message;
+    el.classList.add('show');
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => el.classList.remove('show'), 2200);
+  },
+};
+
+/* ---------------------------- THEME ---------------------------- */
+function applyTheme(themeId){
+  const ids = ['pitch','night','stadium','sunset','classic','neon'];
+  const id = ids.includes(themeId) ? themeId : 'pitch';
+  document.body.classList.remove('theme-pitch','theme-night','theme-stadium','theme-sunset','theme-classic','theme-neon');
+  document.body.classList.add('theme-' + id);
+  const meta = document.querySelector('meta[name=theme-color]');
+  const colors = {pitch:'#0B5D2A',night:'#0D47A1',stadium:'#5B176E',sunset:'#A8430B',classic:'#00796B',neon:'#4A0A5E'};
+  if(meta) meta.setAttribute('content', colors[id]);
+}
+
+/* ---------------------------- VIEWS ---------------------------- */
+const Views = {};
+
+Views.topbar = (title, backHash, rightHtml='') => `
+  <div class="topbar">
+    ${backHash ? `<button class="icon-btn" onclick="location.hash='${backHash}'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>` : `<div style="width:40px"></div>`}
+    <h1>${title}</h1>
+    ${rightHtml || `<div style="width:40px"></div>`}
+  </div>`;
+
+const TAB_ICONS = {
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>',
+  fund: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>',
+  matches: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m8 12 3 3 5-5"/></svg>',
+  members: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+};
+const TAB_DEFS = [
+  { key:'home', label:'Trang chủ', hash:'#/home' },
+  { key:'matches', label:'Trận đấu', hash:'#/matches' },
+  { key:'members', label:'Thành viên', hash:'#/members' },
+  { key:'settings', label:'Cài đặt', hash:'#/settings' },
+];
+
+Views.renderTabbar = () => {
+  const hash = (location.hash || '#/home').slice(1);
+  const parts = hash.split('/').filter(Boolean);
+  const activeKey =
+    (parts[0] === 'matches' || parts[0] === 'match') ? 'matches' :
+    (parts[0] === 'members' || parts[0] === 'member') ? 'members' :
+    (parts[0] === 'settings') ? 'settings' : 'home';
+
+  document.getElementById('bottom-tabbar').innerHTML = TAB_DEFS.map(t => `
+    <button class="tab-item ${activeKey===t.key?'active':''}" onclick="location.hash='${t.hash}'">
+      ${TAB_ICONS[t.key]}
+      <span>${t.label}</span>
+    </button>`).join('');
+};
+
+/* ---- 0. TRANG CHỦ ---- */
+Views.renderHome = () => {
+  const app = document.getElementById('app');
+  const members = MemberService.list();
+  const settings = Storage.get().settings;
+
+  const balances = members.map(m => ({
+    member: m,
+    balance: TransactionService.balanceOf(m.id)
+  }));
+  const totalFund = balances.reduce((sum, x) => sum + x.balance, 0);
+  const activeCount = members.filter(m => m.status === 'active').length;
+
+  app.innerHTML = `
+    ${Views.topbar('Trang chủ', null)}
+    <div class="view">
+      <div style="text-align:center; padding:4px 0 18px;">
+        <div style="font-size:22px;font-weight:800;">Galaxy football team</div>
+      </div>
+
+      <div class="card">
+        <div class="section-title" style="margin-top:0;">Quỹ đội bóng</div>
+        <div style="font-size:28px;font-weight:800;color:var(--primary);margin:8px 0 4px;">
+          ${Utils.formatCurrency(totalFund)}
+        </div>
+        <div class="hint">${activeCount} thành viên đang tham gia</div>
+      </div>
+
+      <div class="card" style="display:flex;gap:10px;">
+        <button class="btn btn-primary" style="flex:1;" onclick="location.hash='#/match/new'">
+          Tạo trận
+        </button>
+        <button class="btn btn-outline" style="flex:1;" onclick="location.hash='#/matches'">
+          Xem trận đấu
+        </button>
+      </div>
+    </div>
+  `;
+};
+
+/* ---- 1. Màn hình QUỸ ---- */
+Views.renderFund = () => {
+  const app = document.getElementById('app');
+  const members = MemberService.list();
+  const settings = Storage.get().settings;
+
+  const balances = members.map(m => ({ member: m, balance: TransactionService.balanceOf(m.id) }));
+  const negativeList = balances.filter(x => x.balance <= 0);
+  const lowList = balances.filter(x => x.balance > 0 && x.balance < settings.warningThreshold);
+  const totalBalance = balances.reduce((sum, x) => sum + x.balance, 0);
+
+  const listItem = (x, danger) => `
+    <div class="row" style="cursor:pointer;" onclick="location.hash='#/member/${x.member.id}'">
+      <span>${Utils.escapeHtml(x.member.name)}</span>
+      <span class="${danger?'balance-danger':'balance-warn'}" style="font-weight:700;">${Utils.formatCurrency(x.balance)}</span>
+    </div>`;
+
+  app.innerHTML = `
+    ${Views.topbar('⚽ Quỹ Đội Bóng', null)}
+    <div class="view">
+      ${negativeList.length > 0 ? `
+        <div class="banner danger">⚠️ ${negativeList.length} người đang âm quỹ</div>
+        <div class="card">${negativeList.map(x => listItem(x, true)).join('')}</div>
+      ` : ''}
+      ${lowList.length > 0 ? `
+        <div class="banner warning">🔔 ${lowList.length} người sắp hết quỹ</div>
+        <div class="card">${lowList.map(x => listItem(x, false)).join('')}</div>
+      ` : ''}
+      ${negativeList.length === 0 && lowList.length === 0 ? `<div class="banner" style="background:#2E7D3218; color:var(--credit); border:1px solid #2E7D3255;">✅ Quỹ mọi người đều ổn định</div>` : ''}
+
+      <div class="card" style="text-align:center;">
+        <div class="hint">Tổng số dư toàn đội (${members.length} thành viên)</div>
+        <div style="font-size:24px; font-weight:800; margin-top:6px;">${Utils.formatCurrency(totalBalance)}</div>
+      </div>
+
+    </div>
+  `;
+};
+
+/* ---- 1b. Màn hình THÀNH VIÊN (danh sách gốc + quản lý) ---- */
+Views.renderMembers = () => {
+  const app = document.getElementById('app');
+  // Màn hình quản lý thành viên phải hiển thị cả người đang tạm không tham gia.
+  // Người active ở trên, inactive ở dưới; mỗi nhóm sắp xếp A-Z.
+  const members = MemberService.listAll().slice().sort((a,b) => {
+    if(a.status !== b.status) return a.status === 'active' ? -1 : 1;
+    return a.name.localeCompare(b.name, 'vi', { sensitivity:'base' });
+  });
+  const settings = Storage.get().settings;
+
+  const rows = members.map(m => {
+    const balance = TransactionService.balanceOf(m.id);
+    let cls = 'balance-ok';
+    if(balance <= 0) cls = 'balance-danger';
+    else if(balance < settings.warningThreshold) cls = 'balance-warn';
+    const inactive = m.status !== 'active';
+    const sub = inactive ? 'Tạm không tham gia' : (balance <= 0 ? 'Cần đóng quỹ' : (balance < settings.warningThreshold ? 'Sắp hết quỹ' : 'Ổn định'));
+    return `
+      <div class="member-row ${inactive ? 'inactive' : ''}" onclick="location.hash='#/member/${m.id}'">
+        <div style="min-width:0; flex:1;">
+          <div class="name">${Utils.escapeHtml(m.name)}</div>
+          <div class="sub">${sub}</div>
+        </div>
+        <div class="member-actions">
+          <div class="balance-tag ${inactive ? '' : cls}">${Utils.formatCurrency(balance)}</div>
+          <button class="member-more" aria-label="Tùy chọn ${Utils.escapeHtml(m.name)}" onclick="event.stopPropagation(); Handlers.memberMenu('${m.id}')">⋮</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  app.innerHTML = `
+    ${Views.topbar('Thành viên', null)}
+    <div class="view">
+      <div class="section-title">Danh sách thành viên (${members.length})</div>
+      ${rows || `<div class="empty-state">Chưa có thành viên nào</div>`}
+    </div>
+    <button class="fab" onclick="Handlers.addMemberPrompt()">+</button>
+  `;
+};
+
+/* ---- 2. Chi tiết thành viên ---- */
+Views.renderMemberDetail = (memberId) => {
+  const app = document.getElementById('app');
+  const member = MemberService.get(memberId);
+  if(!member){ location.hash = '#/members'; return; }
+  const balance = TransactionService.balanceOf(memberId);
+  const txs = TransactionService.forMember(memberId);
+  const settings = Storage.get().settings;
+
+  let cls = 'balance-ok';
+  if(balance <= 0) cls = 'balance-danger';
+  else if(balance < settings.warningThreshold) cls = 'balance-warn';
+
+  const typeLabel = { deposit:'Đóng quỹ', match_cost:'Chi phí trận đấu', adjustment:'Điều chỉnh', reversal:'Hoàn tác trận đấu' };
+
+  const txRows = txs.map(t => `
+    <div class="person-line" ${t.type==='deposit' ? `style="cursor:pointer;" onclick="Handlers.editDepositPrompt('${memberId}','${t.id}',${t.amount})"` : ''}>
+      <span>${typeLabel[t.type] || t.type}${t.type==='deposit' ? ' <span class="hint">(bấm để sửa)</span>' : ''}<br><span class="hint">${Utils.formatDateTime(t.createdAt)}</span></span>
+      <span style="color:${t.amount>=0?'var(--credit)':'var(--debit)'}; font-weight:700;">${Utils.formatSigned(t.amount)}</span>
+    </div>`).join('');
+
+  app.innerHTML = `
+    ${Views.topbar(Utils.escapeHtml(member.name), '#/members')}
+    <div class="view">
+      <div class="card" style="text-align:center;">
+        <div class="hint">Số dư hiện tại</div>
+        <div class="${cls}" style="font-size:26px; font-weight:800; margin-top:6px;">${Utils.formatCurrency(balance)}</div>
+        <div class="btn-row">
+          <button class="btn btn-primary btn-block" onclick="Handlers.depositPrompt('${memberId}')">Đóng tiền</button>
+        </div>
+      </div>
+
+      <div class="section-title">Lịch sử giao dịch</div>
+      <div class="card">${txRows || `<div class="empty-state">Chưa có giao dịch nào</div>`}</div>
+    </div>
+  `;
+};
+
+/* ---- 3. Danh sách trận đấu ---- */
+Views.renderMatchList = () => {
+  const app = document.getElementById('app');
+  const matches = MatchService.list();
+  const statusLabel = { draft:'Nháp', completed:'Hoàn thành', cancelled:'Đã hủy' };
+
+  const rows = matches.map(m => `
+    <div class="match-row" onclick="location.hash='${m.status==='draft' ? '#/match/'+m.id+'/edit' : '#/match/'+m.id}'">
+      <div class="top">
+        <span class="title">${Utils.escapeHtml(m.location || 'Chưa có địa điểm')}</span>
+        <span class="status-badge status-${m.status}">${statusLabel[m.status]}</span>
+      </div>
+      <div class="meta">${m.date || ''} ${m.time || ''} · Tiền sân ${Utils.formatCurrency(m.fieldFee||0)}</div>
+    </div>`).join('');
+
+  app.innerHTML = `
+    ${Views.topbar('Danh sách trận đấu', null)}
+    <div class="view">
+      ${rows || `<div class="empty-state">Chưa có trận đấu nào</div>`}
+    </div>
+    <button class="fab" onclick="location.hash='#/match/new'">+</button>
+  `;
+};
+
+/* ---- 4. Tạo / Sửa trận đấu ---- */
+let lastPreview = null; // { matchId, result }
+const timePickerExpanded = {}; // { [matchId]: { hour:boolean, minute:boolean } }
+
+Views.renderMatchForm = (matchId) => {
+  const app = document.getElementById('app');
+  const match = MatchService.get(matchId);
+  if(!match){ location.hash = '#/matches'; return; }
+
+  const team1 = match.participants.filter(p=>p.team==='team1');
+  const team2 = match.participants.filter(p=>p.team==='team2');
+  const ratioPresets = Storage.get().settings.ratioPresets;
+  const isRatioActive = r => match.ratio && match.ratio.losingShare === r.losingShare && match.ratio.winningShare === r.winningShare;
+  const nameOf = p => p.refType === 'member'
+    ? (MemberService.get(p.refId)?.name || '(đã xóa)')
+    : (match.guests.find(g=>g.id===p.refId)?.name || '(khách)');
+
+  const teamPlayers = team => team.length ? team.map(p => `
+    <div class="team-player">
+      <span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span>
+      <button class="remove-player" title="Bỏ khỏi trận" onclick="Handlers.removeParticipant('${matchId}','${p.refType}','${p.refId}')">×</button>
+    </div>`).join('') : `<div class="hint" style="padding:8px 0;">Chưa có cầu thủ</div>`;
+
+  const bothTeamsReady = team1.length > 0 && team2.length > 0;
+  const canConfirmSetup = bothTeamsReady && !!match.ratio && Number(match.fieldFee) > 0;
+
+  app.innerHTML = `
+    ${Views.topbar(match.status === MatchStatus.COMPLETED ? 'Sửa trận đấu' : 'Tạo trận đấu', '#/matches')}
+    <div class="view">
+      <div class="section-title">Thông tin trận</div>
+      <div class="card">
+        <div class="field"><label>Ngày</label><input type="date" value="${match.date||''}" onchange="Handlers.setField('${matchId}','date',this.value)"></div>
+        <div class="field">
+          <label>Giờ đá</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            ${(() => {
+              const currentHour = String(match.time||'').slice(0,2) || '16';
+              const currentMinute = String(match.time||'').slice(3,5) || '00';
+              const quickHours = ['16','17','18','19','20','21'];
+              const quickMinutes = ['00','15','30','45'];
+              const hourDetailed = !!timePickerExpanded[matchId]?.hour;
+              const minuteDetailed = !!timePickerExpanded[matchId]?.minute;
+              const hourOptions = hourDetailed
+                ? Array.from({length:24},(_,i)=>String(i).padStart(2,'0'))
+                : quickHours;
+              const minuteOptions = minuteDetailed
+                ? Array.from({length:60},(_,i)=>String(i).padStart(2,'0'))
+                : quickMinutes;
+              return `
+                <div class="time-picker" id="hour-picker-${matchId}">
+                  <button type="button" class="time-picker-btn" onclick="event.stopPropagation(); Handlers.toggleHourPicker('${matchId}')">
+                    <span>${Utils.escapeHtml(currentHour)}</span><span style="font-size:12px;color:#777;">⌄</span>
+                  </button>
+                  <div class="time-picker-menu" id="hour-menu-${matchId}" hidden>
+                    ${hourOptions.map(h=>`<button type="button" class="time-picker-option" onclick="event.stopPropagation(); Handlers.chooseHour('${matchId}','${h}')">${h}</button>`).join('')}
+                    ${!hourDetailed ? `<button type="button" class="time-picker-option other" onclick="event.stopPropagation(); Handlers.chooseHour('${matchId}','__other__')">Khác</button>` : ''}
+                  </div>
+                </div>
+                <span style="font-weight:700;">:</span>
+                <div class="time-picker" id="minute-picker-${matchId}">
+                  <button type="button" class="time-picker-btn" onclick="event.stopPropagation(); Handlers.toggleMinutePicker('${matchId}')">
+                    <span>${Utils.escapeHtml(currentMinute)}</span><span style="font-size:12px;color:#777;">⌄</span>
+                  </button>
+                  <div class="time-picker-menu" id="minute-menu-${matchId}" hidden>
+                    ${minuteOptions.map(m=>`<button type="button" class="time-picker-option" onclick="event.stopPropagation(); Handlers.chooseMinute('${matchId}','${m}')">${m}</button>`).join('')}
+                    ${!minuteDetailed ? `<button type="button" class="time-picker-option other" onclick="event.stopPropagation(); Handlers.chooseMinute('${matchId}','__other__')">Khác</button>` : ''}
+                  </div>
+                </div>
+              `;
+            })()}
+          </div>
+        </div>
+        <div class="field">
+          <label>Sân bóng</label>
+          <input type="text" list="saved-locations-${matchId}" value="${Utils.escapeHtml(match.location||'')}" placeholder="Gõ tên sân..." onchange="Handlers.saveLocation(this.value); Handlers.setField('${matchId}','location',this.value)">
+          <datalist id="saved-locations-${matchId}">
+            ${(Storage.get().settings.savedLocations||[]).map(x=>`<option value="${Utils.escapeHtml(x)}"></option>`).join('')}
+          </datalist>
+        </div>
+        <div class="field" style="margin-bottom:0;"><label>Tiền sân (VNĐ)</label><input type="number" value="${match.fieldFee ? Math.round(match.fieldFee / 1000) : ''}" inputmode="numeric" placeholder="VD: 350 = 350.000 VNĐ" onchange="Handlers.setFieldFee('${matchId}',this.value)"></div>
+      </div>
+
+      <div class="section-title">Chọn đội hình</div>
+      <div class="team-grid">
+        <div class="team-card">
+          <div class="team-card-header"><span>Đội 1</span><button class="add-team-btn" onclick="Handlers.openTeamPicker('${matchId}','team1')">＋ Thêm</button></div>
+          ${teamPlayers(team1)}
+        </div>
+        <div class="team-card">
+          <div class="team-card-header"><span>Đội 2</span><button class="add-team-btn" onclick="Handlers.openTeamPicker('${matchId}','team2')">＋ Thêm</button></div>
+          ${teamPlayers(team2)}
+        </div>
+      </div>
+      <button class="btn btn-outline btn-block" style="margin-top:12px;" onclick="Handlers.addGuestPrompt('${matchId}')">＋ Thêm khách vào trận</button>
+
+      <div class="section-title">Kèo chia tiền sân</div>
+      <div class="chip-row">
+        ${ratioPresets.map(r => `<span class="chip ${isRatioActive(r)?'active':''}" onclick="Handlers.setRatio('${matchId}',${r.losingShare},${r.winningShare})">${r.losingShare===100?'100%':`${r.losingShare}/${r.winningShare}`}</span>`).join('')}
+        <span class="chip" onclick="Handlers.customRatioPrompt('${matchId}')">:</span>
+      </div>
+      <div class="hint">Tỷ lệ viết theo ĐỘI THUA / ĐỘI THẮNG. Ví dụ 60/40: đội thua chịu 60%, đội thắng chịu 40%.</div>
+
+      <div class="card ${canConfirmSetup?'confirm-card':''}" style="margin-top:18px;">
+        ${canConfirmSetup
+          ? `<div class="confirm-title"><span class="confirm-icon">✓</span> Đã đủ thông tin trận đấu</div>
+             <div class="hint">Bấm <b>Xác nhận</b> để chuyển sang bước <b>Kết quả trận đấu</b>. Ở bước đó mới chọn đội thắng và tính tiền.</div>`
+          : `<div class="hint">${!bothTeamsReady ? 'Hãy thêm ít nhất 1 người vào cả Đội 1 và Đội 2.' : (!match.ratio ? 'Hãy chọn kèo chia tiền sân.' : 'Hãy nhập tiền sân hợp lệ.')}</div>`}
+      </div>
+
+      ${canConfirmSetup ? `<button class="btn btn-orange-action btn-block" style="margin-top:10px;" onclick="Handlers.confirmLineup('${matchId}')">✓ &nbsp; Xác nhận</button>` : ''}
+
+      ${match.status !== MatchStatus.COMPLETED
+        ? `<button class="btn btn-danger-outline btn-block" style="margin-top:14px;" onclick="Handlers.discardDraft('${matchId}')">Xóa bản nháp</button>`
+        : `<button class="btn btn-danger-outline btn-block" style="margin-top:14px;" onclick="Handlers.cancelMatchPrompt('${matchId}')">Hủy trận đấu</button>`}
+    </div>`;
+};
+
+/* ---- 5.1. Bước riêng: KẾT QUẢ TRẬN ĐẤU ---- */
+Views.renderMatchResultSetup = (matchId) => {
+  const app = document.getElementById('app');
+  const match = MatchService.get(matchId);
+  if(!match){ location.hash = '#/matches'; return; }
+  if(!match.setupConfirmed){ location.hash = '#/match/' + matchId + '/edit'; return; }
+
+  const nameOf = p => p.refType === 'member'
+    ? (MemberService.get(p.refId)?.name || '(đã xóa)')
+    : (match.guests.find(g=>g.id===p.refId)?.name || '(khách)');
+  const team1 = match.participants.filter(p=>p.team==='team1');
+  const team2 = match.participants.filter(p=>p.team==='team2');
+  const playerLines = team => team.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span></div>`).join('');
+
+  let calculationHtml = '';
+  if(lastPreview && lastPreview.matchId === matchId){
+    const { perPersonAmounts, totalCollected, errors } = lastPreview.result;
+    if(errors.length){
+      calculationHtml = `<div class="banner danger">${errors.map(Utils.escapeHtml).join('<br>')}</div>`;
+    } else {
+      const winningTeam = match.winningTeam;
+      const losingTeam = winningTeam === 'team1' ? 'team2' : 'team1';
+      const winningLines = perPersonAmounts.filter(p=>p.team===winningTeam).map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+      const losingLines = perPersonAmounts.filter(p=>p.team===losingTeam).map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+      calculationHtml = `
+        <div class="section-title">Kết quả tính tiền</div>
+        <div class="card">
+          <div class="team-block"><h3 class="winner">Đội ${winningTeam==='team1'?'1':'2'} thắng 🏆</h3>${winningLines}</div>
+          <div class="team-block"><h3>Đội ${losingTeam==='team1'?'1':'2'} thua</h3>${losingLines}</div>
+          <div class="total-line"><span>Tổng đóng quỹ</span><span>${Utils.formatCurrency(totalCollected)}</span></div>
+          <div class="hint">Tiền sân: ${Utils.formatCurrency(match.fieldFee)} — tổng đóng có thể nhỉnh hơn do làm tròn lên từng người.</div>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="Handlers.confirmMatch('${matchId}')">✅ Xác nhận & Lưu trận</button>`;
+    }
+  }
+
+  app.innerHTML = `
+    ${Views.topbar('Kết quả trận đấu', '#/matches')}
+    <div class="view">
+      <div class="result-header">
+        <div style="font-weight:700;">${match.date || ''} ${match.time || ''}</div>
+        <div class="loc">${Utils.escapeHtml(match.location || '')}</div>
+        <div class="fee">Tiền sân: ${Utils.formatCurrency(match.fieldFee)}</div>
+        <div class="loc">Tỷ lệ ${match.ratio.losingShare}/${match.ratio.winningShare} (đội thua/đội thắng)</div>
+      </div>
+
+      <div class="section-title">Đội hình đã xác nhận</div>
+      <div class="team-grid">
+        <div class="team-card"><div class="team-card-header"><span>Đội 1</span></div>${playerLines(team1)}</div>
+        <div class="team-card"><div class="team-card-header"><span>Đội 2</span></div>${playerLines(team2)}</div>
+      </div>
+
+      <div class="section-title">Kết quả trận đấu</div>
+      <div class="card">
+        <div class="hint" style="margin-bottom:10px;">Chọn đội thắng. Sau đó bấm “Tính toán” để chia tiền sân.</div>
+        <div class="chip-row">
+          <span class="chip ${match.winningTeam==='team1'?'active':''}" onclick="Handlers.setWinner('${matchId}','team1')">Đội 1 thắng</span>
+          <span class="chip ${match.winningTeam==='team2'?'active':''}" onclick="Handlers.setWinner('${matchId}','team2')">Đội 2 thắng</span>
+        </div>
+      </div>
+
+      ${match.winningTeam ? `<button class="btn btn-orange-action btn-block" style="margin-top:10px;" onclick="Handlers.calculatePreview('${matchId}')">🧮 Tính toán</button>` : ''}
+      ${calculationHtml}
+
+      <button class="btn btn-outline btn-block" style="margin-top:14px;" onclick="Handlers.backToMatchForm('${matchId}')">← Quay lại chỉnh đội hình</button>
+    </div>`;
+};
+
+/* ---- 5. Màn hình KẾT QUẢ TRẬN ---- */
+Views.renderMatchResult = (matchId) => {
+  const app = document.getElementById('app');
+  const match = MatchService.get(matchId);
+  if(!match){ location.hash = '#/matches'; return; }
+
+  if(match.status !== MatchStatus.COMPLETED){
+    location.hash = '#/match/' + matchId + '/edit';
+    return;
+  }
+
+  const nameOf = (p) => p.refType === 'member' ? (MemberService.get(p.refId)?.name || '(đã xóa)') : (match.guests.find(g=>g.id===p.refId)?.name || 'Khách');
+  const guestTag = (p) => {
+    if(p.refType !== 'guest') return '';
+    const g = match.guests.find(x=>x.id===p.refId);
+    return ` <span class="badge badge-guest">Khách</span> <span class="badge ${g?.paid?'badge-paid':'badge-unpaid'}" style="cursor:pointer;" onclick="Handlers.toggleGuestPaidInResult('${matchId}','${p.refId}')">${g?.paid?'Đã thu':'Chưa thu'}</span>`;
+  };
+  const winningTeam = match.winningTeam;
+  const losingTeam = winningTeam === 'team1' ? 'team2' : 'team1';
+  const winningLines = match.perPersonAmounts.filter(p=>p.team===winningTeam).map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${guestTag(p)}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+  const losingLines = match.perPersonAmounts.filter(p=>p.team===losingTeam).map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${guestTag(p)}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+  const total = match.perPersonAmounts.reduce((s,p)=>s+p.amount, 0);
+
+  app.innerHTML = `
+    ${Views.topbar('Kết quả trận đấu', '#/matches')}
+    <div class="view">
+      <div class="result-header">
+        <div style="font-weight:700;">${match.date || ''} ${match.time || ''}</div>
+        <div class="loc">${Utils.escapeHtml(match.location || '')}</div>
+        <div class="fee">Tiền sân: ${Utils.formatCurrency(match.fieldFee)}</div>
+        <div class="loc">Tỷ lệ ${match.ratio.losingShare}/${match.ratio.winningShare} (đội thua/đội thắng)</div>
+      </div>
+
+      <div class="card">
+        <div class="team-block"><h3 class="winner">Đội ${winningTeam==='team1'?'1':'2'} thắng 🏆</h3>${winningLines}</div>
+        <div class="team-block"><h3>Đội ${losingTeam==='team1'?'1':'2'} thua</h3>${losingLines}</div>
+        <div class="total-line"><span>Tổng đóng quỹ</span><span>${Utils.formatCurrency(total)}</span></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="location.hash='#/match/${matchId}/edit'">Sửa trận</button>
+        <button class="btn btn-danger-outline" onclick="Handlers.cancelMatchPrompt('${matchId}')">Hủy trận</button>
+      </div>
+    </div>
+  `;
+};
+
+/* ---- 6. Cài đặt ---- */
+Views.renderSettings = () => {
+  const app = document.getElementById('app');
+  const settings = Storage.get().settings;
+  const thresholdDisplay = Math.max(1, Math.round((Number(settings.warningThreshold) || 200000) / 1000));
+  const theme = settings.theme || 'pitch';
+  const themes = [
+    {id:'pitch', name:'Sân cỏ'},
+    {id:'night', name:'Sân đêm'},
+    {id:'stadium', name:'Khán đài'},
+    {id:'sunset', name:'Hoàng hôn'},
+    {id:'classic', name:'Bóng cổ điển'},
+    {id:'neon', name:'Neon sân bóng'},
+  ];
+
+  app.innerHTML = `
+    ${Views.topbar('Cài đặt', null)}
+    <div class="view">
+      <div class="section-title">Cảnh báo</div>
+      <div class="card settings-compact-card">
+        <div class="settings-inline">
+          <div class="settings-copy">
+            <div class="settings-label">Ngưỡng cảnh báo</div>
+            <div class="hint">Nhập 200 = 200.000đ. Thành viên còn dưới mức này sẽ được cảnh báo.</div>
+          </div>
+          <div class="settings-value">
+            <input id="warning-threshold-input" type="number" value="${thresholdDisplay}" inputmode="numeric" min="1" aria-label="Ngưỡng cảnh báo, đơn vị nghìn đồng">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm settings-save-btn" onclick="Handlers.saveWarningThreshold()">Lưu</button>
+      </div>
+
+      <div class="section-title">Giao diện</div>
+      <div class="card settings-compact-card">
+        <div class="field" style="margin:0;">
+          <label for="theme-select">Chọn giao diện</label>
+          <select id="theme-select" onchange="Handlers.setTheme(this.value)">
+            ${themes.map(t => `<option value="${t.id}" ${theme===t.id?'selected':''}>${t.name}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="section-title">About</div>
+      <div class="card about-card" style="padding:0; cursor:pointer;" onclick="Handlers.showAbout()">
+        <div class="about-row" style="padding:14px 16px; border-bottom:0;">
+          <span style="color:var(--text-main); font-weight:600;">About</span>
+          <span style="font-size:20px; color:var(--text-sub);">›</span>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+/* ---------------------------- HANDLERS (gắn lên window, gọi từ onclick) ---------------------------- */
+const Handlers = {
+  addMemberPrompt(){
+    Dialogs.promptText('Thêm thành viên', 'Tên thành viên', (name) => {
+      MemberService.add(name);
+      Snackbar.show('Đã thêm thành viên');
+      Views.renderMembers();
+    });
+  },
+  depositPrompt(memberId){
+    Dialogs.promptAmount('Đóng tiền vào quỹ', (amount) => {
+      TransactionService.addDeposit(memberId, amount);
+      Snackbar.show(`Đã đóng ${Utils.formatCurrency(amount)} vào quỹ`);
+      Views.renderMemberDetail(memberId);
+    });
+  },
+  editDepositPrompt(memberId, txId, currentAmount){
+    Dialogs.openSheet(`
+      <h3>Giao dịch đóng quỹ</h3>
+      <p class="hint" style="margin-bottom:14px;">Số tiền hiện tại: ${Utils.formatCurrency(currentAmount)}</p>
+      <button class="btn btn-primary btn-block" style="margin-bottom:10px;" id="dlg-edit-deposit-btn">Sửa số tiền</button>
+      <button class="btn btn-danger-outline btn-block" id="dlg-cancel-deposit-btn">Hủy giao dịch này (nạp nhầm)</button>
+    `);
+    document.getElementById('dlg-edit-deposit-btn').onclick = () => {
+      Dialogs.closeSheet();
+      Dialogs.promptAmount('Sửa số tiền đóng quỹ', (newAmount) => {
+        TransactionService.correctDeposit(txId, newAmount);
+        Snackbar.show('Đã cập nhật số tiền');
+        Views.renderMemberDetail(memberId);
+      });
+    };
+    document.getElementById('dlg-cancel-deposit-btn').onclick = () => {
+      Dialogs.closeSheet();
+      Dialogs.confirm(`Hủy giao dịch nạp ${Utils.formatCurrency(currentAmount)} này? Hệ thống sẽ hoàn lại đúng số tiền, giữ nguyên lịch sử.`, () => {
+        TransactionService.cancelDeposit(txId);
+        Snackbar.show('Đã hủy giao dịch');
+        Views.renderMemberDetail(memberId);
+      }, true);
+    };
+  },
+  memberMenu(memberId){
+    const member = MemberService.get(memberId);
+    if(!member) return;
+    const balance = TransactionService.balanceOf(memberId);
+    const inactive = member.status !== 'active';
+    Dialogs.openSheet(`
+      <h3>Tùy chọn — ${Utils.escapeHtml(member.name)}</h3>
+      <button class="btn btn-outline btn-block" style="margin-bottom:10px;" onclick="Dialogs.closeSheet(); Handlers.renamePrompt('${memberId}', true)">✏️ Đổi tên</button>
+      ${inactive
+        ? `<button class="btn btn-outline btn-block" style="margin-bottom:10px;" onclick="Dialogs.closeSheet(); Handlers.confirmSetStatus('${memberId}','active', true)">✅ Tham gia trở lại</button>`
+        : `<button class="btn btn-outline btn-block" style="margin-bottom:10px;" onclick="Dialogs.closeSheet(); Handlers.confirmSetStatus('${memberId}','inactive', true)">⏸️ Tạm không tham gia</button>`}
+      <button class="btn btn-danger-outline btn-block" ${balance !== 0 ? 'disabled style="opacity:.45; cursor:not-allowed;"' : `onclick="Dialogs.closeSheet(); Handlers.deleteMemberPrompt('${memberId}')"`}>🗑️ Xóa thành viên${balance !== 0 ? ' (chỉ khi 0đ)' : ''}</button>
+    `);
+  },
+  renamePrompt(memberId, returnToMembers=false){
+    const member = MemberService.get(memberId);
+    if(!member) return;
+    Dialogs.promptText('Đổi tên thành viên', member.name, (name) => {
+      MemberService.rename(memberId, name);
+      Snackbar.show('Đã đổi tên');
+      if(returnToMembers) Views.renderMembers();
+      else Views.renderMemberDetail(memberId);
+    });
+  },
+  confirmSetStatus(memberId, status, returnToMembers=false){
+    const msg = status === 'inactive' ? 'Cho thành viên này tạm không tham gia? Lịch sử và số dư vẫn được giữ nguyên.' : 'Cho thành viên này tham gia lại các trận mới?';
+    Dialogs.confirm(msg, () => {
+      MemberService.setStatus(memberId, status);
+      Snackbar.show(status === 'inactive' ? 'Đã chuyển sang tạm không tham gia' : 'Đã cho tham gia lại');
+      if(returnToMembers) Views.renderMembers();
+      else Views.renderMemberDetail(memberId);
+    });
+  },
+  deleteMemberPrompt(memberId){
+    const member = MemberService.get(memberId);
+    const balance = TransactionService.balanceOf(memberId);
+    if(balance !== 0){ Dialogs.alert('Chỉ được xóa thành viên khi số dư quỹ đúng bằng 0 VNĐ.'); return; }
+    Dialogs.confirm(`Xóa "${member.name}" khỏi danh sách thành viên? Vì số dư hiện tại là 0 VNĐ nên có thể xóa. Lịch sử trận đấu cũ vẫn được giữ trong dữ liệu.`, () => {
+      const res = MemberService.remove(memberId);
+      if(!res.ok){ Dialogs.alert(res.reason); return; }
+      Snackbar.show('Đã xóa khỏi danh sách thành viên');
+      location.hash = '#/members';
+    }, true);
+  },
+
+  saveLocation(name){
+    const value = String(name || '').trim();
+    if(!value) return;
+    const settings = Storage.get().settings;
+    if(!Array.isArray(settings.savedLocations)) settings.savedLocations = [];
+    settings.savedLocations = [value, ...settings.savedLocations.filter(x => x.toLowerCase() !== value.toLowerCase())].slice(0, 30);
+    Storage.save();
+  },
+  openDetailedTime(matchId){
+    const match = MatchService.get(matchId);
+    const current = match?.time || '16:00';
+    const currentHour = current.slice(0,2);
+    const currentMinute = current.slice(3,5);
+    Dialogs.openSheet(`
+      <h3>Chọn giờ đá</h3>
+      <div class="field">
+        <label>Giờ</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="detail-hour-${matchId}" style="flex:1;padding:13px;border-radius:12px;border:1px solid #DDD;font-size:16px;background:#fff;">
+            ${Array.from({length:24},(_,h)=>`<option value="${String(h).padStart(2,'0')}" ${currentHour===String(h).padStart(2,'0')?'selected':''}>${String(h).padStart(2,'0')}</option>`).join('')}
+          </select>
+          <span style="font-weight:700;">:</span>
+          <select id="detail-minute-${matchId}" style="flex:1;padding:13px;border-radius:12px;border:1px solid #DDD;font-size:16px;background:#fff;">
+            ${['00','15','30','45'].map(m=>`<option value="${m}" ${currentMinute===m?'selected':''}>${m}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" id="detail-time-btn-${matchId}">Xác nhận</button>
+    `);
+    document.getElementById(`detail-time-btn-${matchId}`).onclick = () => {
+      const hour = document.getElementById(`detail-hour-${matchId}`).value;
+      const minute = document.getElementById(`detail-minute-${matchId}`).value;
+      Dialogs.closeSheet();
+      Handlers.setDetailedTime(matchId, `${hour}:${minute}`);
+    };
+  },
+  toggleHourPicker(matchId){
+    const menu = document.getElementById(`hour-menu-${matchId}`);
+    if(!menu) return;
+    const willOpen = menu.hidden;
+    document.querySelectorAll('.time-picker-menu').forEach(m => { m.hidden = true; });
+    menu.hidden = !willOpen;
+  },
+  toggleMinutePicker(matchId){
+    const menu = document.getElementById(`minute-menu-${matchId}`);
+    if(!menu) return;
+    const willOpen = menu.hidden;
+    document.querySelectorAll('.time-picker-menu').forEach(m => { m.hidden = true; });
+    menu.hidden = !willOpen;
+  },
+  chooseHour(matchId, value){
+    const match = MatchService.get(matchId);
+    if(!match) return;
+
+    if(value === '__other__'){
+      // Chuyển CHÍNH dropdown giờ sang bảng 24h và mở ngay bảng đó.
+      timePickerExpanded[matchId] = {hour:true};
+      Views.renderMatchForm(matchId);
+      requestAnimationFrame(() => {
+        const menu = document.getElementById(`hour-menu-${matchId}`);
+        if(menu) menu.hidden = false;
+      });
+      return;
+    }
+
+    const minute = String(match.time||'').slice(3,5) || '00';
+    MatchService.update(matchId, { time: `${String(value).padStart(2,'0')}:${minute}` });
+    lastPreview = null;
+    Views.renderMatchForm(matchId);
+  },
+  setHourChoice(matchId, value){
+    // Tương thích với dữ liệu/UI cũ nếu còn gọi handler này.
+    Handlers.chooseHour(matchId, value);
+  },
+  chooseMinute(matchId, value){
+    const match = MatchService.get(matchId);
+    if(!match) return;
+
+    if(value === '__other__'){
+      timePickerExpanded[matchId] = {
+        ...(timePickerExpanded[matchId] || {}),
+        minute:true
+      };
+      Views.renderMatchForm(matchId);
+      requestAnimationFrame(() => {
+        const menu = document.getElementById(`minute-menu-${matchId}`);
+        if(menu) menu.hidden = false;
+      });
+      return;
+    }
+
+    const minute = String(value).padStart(2,'0');
+    if(!/^([0-5][0-9])$/.test(minute)) return;
+    const hour = String(match.time||'').slice(0,2) || '16';
+
+    MatchService.update(matchId, { time: `${hour}:${minute}` });
+    lastPreview = null;
+    Views.renderMatchForm(matchId);
+  },
+  setMinuteChoice(matchId, value){
+    // Tương thích dữ liệu/UI cũ.
+    Handlers.chooseMinute(matchId, value);
+  },
+  setField(matchId, field, value){
+    MatchService.update(matchId, { [field]: value });
+    lastPreview = null;
+    Views.renderMatchForm(matchId);
+  },
+  setFieldFee(matchId, value){
+    const v = parseInt(value, 10);
+    MatchService.update(matchId, { fieldFee: isNaN(v) ? 0 : v * 1000 });
+    lastPreview = null;
+    Views.renderMatchForm(matchId);
+  },
+  addParticipant(matchId, refType, refId){
+    MatchService.addParticipant(matchId, refType, refId);
+    lastPreview = null;
+    Views.renderMatchForm(matchId);
+  },
+  removeParticipant(matchId, refType, refId){
+    MatchService.removeParticipant(matchId, refType, refId);
+    lastPreview = null;
+    Views.renderMatchForm(matchId);
+  },
+  openTeamPicker(matchId, team){
+    const match = MatchService.get(matchId);
+    if(!match) return;
+    const chosen = new Set(match.participants.map(p=>`${p.refType}:${p.refId}`));
+    const available = MemberService.list().filter(m => !chosen.has(`member:${m.id}`));
+    const rows = available.map(m => `
+      <div class="picker-row" onclick="Handlers.pickMemberForTeam('${matchId}','${team}','${m.id}')">
+        <span>${Utils.escapeHtml(m.name)}</span><span class="picker-add">＋</span>
+      </div>`).join('');
+    Dialogs.openSheet(`
+      <h3>Thêm vào ${team==='team1'?'Đội 1':'Đội 2'}</h3>
+      ${rows || `<div class="empty-state" style="padding:25px 10px;">Không còn thành viên đang tham gia đội bóng để chọn.</div>`}
+      <div class="hint" style="margin-top:10px;">Chỉ hiện người đang ở trạng thái tham gia. Người “tạm không tham gia” sẽ không xuất hiện.</div>
+    `);
+  },
+  pickMemberForTeam(matchId, team, memberId){
+    MatchService.addParticipant(matchId,'member',memberId);
+    MatchService.setTeam(matchId,'member',memberId,team);
+    lastPreview = null;
+    Dialogs.closeSheet();
+    Views.renderMatchForm(matchId);
+  },
+  addGuestPrompt(matchId){
+    Dialogs.promptText('Thêm khách', 'Tên khách', (name) => {
+      Dialogs.openSheet(`
+        <h3>Khách vào đội nào?</h3>
+        <div class="btn-row">
+          <button class="btn btn-outline" id="guest-team1">Đội 1</button>
+          <button class="btn btn-outline" id="guest-team2">Đội 2</button>
+        </div>
+      `);
+      const addTo = team => {
+        const guest = MatchService.addGuest(matchId, name);
+        if(guest) MatchService.setTeam(matchId,'guest',guest.id,team);
+        lastPreview = null;
+        Dialogs.closeSheet();
+        Views.renderMatchForm(matchId);
+      };
+      document.getElementById('guest-team1').onclick = () => addTo('team1');
+      document.getElementById('guest-team2').onclick = () => addTo('team2');
+    });
+  },
+  toggleGuestPaidInForm(matchId, guestId){
+    const match = MatchService.get(matchId);
+    const guest = match.guests.find(g => g.id === guestId);
+    MatchService.setGuestPaid(matchId, guestId, !guest.paid);
+    Views.renderMatchForm(matchId);
+  },
+  toggleGuestPaidInResult(matchId, guestId){
+    const match = MatchService.get(matchId);
+    const guest = match.guests.find(g => g.id === guestId);
+    MatchService.setGuestPaid(matchId, guestId, !guest.paid);
+    Views.renderMatchResult(matchId);
+  },
+  setTeam(matchId, refType, refId, team){
+    MatchService.setTeam(matchId, refType, refId, team);
+    lastPreview = null;
+    Views.renderMatchForm(matchId);
+  },
+  setRatio(matchId, losingShare, winningShare){
+    MatchService.update(matchId, { ratio: { losingShare, winningShare } });
+    lastPreview = null;
+    Views.renderMatchForm(matchId);
+  },
+  customRatioPrompt(matchId){
+    Dialogs.openSheet(`
+      <h3>Tỷ lệ tùy chỉnh</h3>
+      <div class="field"><label>Phần trăm đội THUA (%)</label><input type="number" id="dlg-losing-input" inputmode="numeric" placeholder="VD: 65"></div>
+      <button class="btn btn-primary" id="dlg-ratio-btn">Xác nhận</button>
+    `);
+    document.getElementById('dlg-ratio-btn').onclick = () => {
+      const losing = parseInt(document.getElementById('dlg-losing-input').value, 10);
+      if(isNaN(losing) || losing <= 0 || losing >= 100){ Snackbar.show('Phần trăm không hợp lệ (1-99)'); return; }
+      Dialogs.closeSheet();
+      Handlers.setRatio(matchId, losing, 100 - losing);
+    };
+  },
+  confirmLineup(matchId){
+    const match = MatchService.get(matchId);
+    if(!match) return;
+    const team1 = match.participants.filter(p=>p.team==='team1');
+    const team2 = match.participants.filter(p=>p.team==='team2');
+    if(team1.length === 0 || team2.length === 0){ Dialogs.alert('Mỗi đội phải có ít nhất 1 người tham gia.'); return; }
+    if(!match.ratio){ Dialogs.alert('Vui lòng chọn kèo chia tiền sân.'); return; }
+    if(!match.fieldFee || match.fieldFee <= 0){ Dialogs.alert('Vui lòng nhập tiền sân hợp lệ.'); return; }
+    MatchService.update(matchId, { setupConfirmed: true, winningTeam: null });
+    lastPreview = null;
+    Snackbar.show('Đã xác nhận đội hình và kèo');
+    location.hash = '#/match/' + matchId + '/result';
+  },
+  backToMatchForm(matchId){
+    MatchService.update(matchId, { setupConfirmed: false, winningTeam: null });
+    lastPreview = null;
+    location.hash = '#/match/' + matchId + '/edit';
+  },
+  setWinner(matchId, team){
+    MatchService.update(matchId, { winningTeam: team });
+    lastPreview = null;
+    Views.renderMatchResultSetup(matchId);
+  },
+  calculatePreview(matchId){
+    const match = MatchService.get(matchId);
+    const result = MatchService.calculateCosts(match);
+    lastPreview = { matchId, result };
+    Views.renderMatchResultSetup(matchId);
+  },
+  confirmMatch(matchId){
+    const res = MatchService.confirm(matchId);
+    if(!res.ok){ Dialogs.alert(res.errors.join('\n')); return; }
+    lastPreview = null;
+    Snackbar.show('Đã lưu trận đấu');
+    location.hash = '#/match/' + matchId;
+  },
+  discardDraft(matchId){
+    Dialogs.confirm('Xóa bản nháp này? Thao tác không thể hoàn tác.', () => {
+      const state = Storage.get();
+      state.matches = state.matches.filter(m => m.id !== matchId);
+      Storage.save();
+      Snackbar.show('Đã xóa bản nháp');
+      location.hash = '#/matches';
+    }, true);
+  },
+  cancelMatchPrompt(matchId){
+    Dialogs.confirm('Hủy trận đấu này? Toàn bộ giao dịch liên quan sẽ được hoàn tác, nhưng lịch sử vẫn được giữ lại.', () => {
+      MatchService.cancel(matchId);
+      Snackbar.show('Đã hủy trận đấu');
+      location.hash = '#/matches';
+    }, true);
+  },
+
+  setWarningThreshold(value){
+    const v = parseInt(value, 10);
+    if(isNaN(v) || v <= 0){ Snackbar.show('Giá trị không hợp lệ'); return false; }
+    Storage.get().settings.warningThreshold = v * 1000;
+    Storage.save();
+    return true;
+  },
+  setTheme(themeId){
+    const allowed = ['pitch','night','stadium','sunset','classic','neon'];
+    if(!allowed.includes(themeId)) return;
+    Storage.get().settings.theme = themeId;
+    Storage.save();
+    applyTheme(themeId);
+    Views.renderSettings();
+    Views.renderTabbar();
+    Snackbar.show('Đã đổi giao diện');
+  },
+  saveWarningThreshold(){
+    const input = document.getElementById('warning-threshold-input');
+    if(!input) return;
+    if(Handlers.setWarningThreshold(input.value)) Snackbar.show('Đã lưu ngưỡng cảnh báo');
+  },
+  showAbout(){
+    Dialogs.openDialog(`
+      <h3>About</h3>
+      <div style="font-size:14px; line-height:1.8;">
+        <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
+          <span style="color:var(--text-sub);">Version</span>
+          <strong>v16</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
+          <span style="color:var(--text-sub);">Developer</span>
+          <strong>Trọng Hiếu</strong>
+        </div>
+      </div>
+      <div class="dialog-actions" style="margin-top:18px;">
+        <button class="btn-confirm" onclick="Dialogs.closeDialog()">Đóng</button>
+      </div>`);
+  },
+};
+
+document.addEventListener('click', (event) => {
+  if(!event.target.closest('.time-picker')){
+    document.querySelectorAll('.time-picker-menu').forEach(m => { m.hidden = true; });
+  }
+});
+
+/* ---------------------------- ROUTER ---------------------------- */
+const Router = {
+  route(){
+    const hash = (location.hash || '#/home').slice(1);
+    const parts = hash.split('/').filter(Boolean);
+
+    if(parts[0] === 'match' && parts[1] === 'new'){
+      const settings = Storage.get().settings;
+      const defaultTime = Utils.nowTimeHHMM();
+      const defaultHour = defaultTime.slice(0,2);
+      const match = MatchService.createDraft({
+        date: Utils.todayISODate(),
+        time: defaultTime,
+        location: '',
+        fieldFee: 0,
+        ratio: settings.ratioPresets[1]
+      });
+
+      // Nếu giờ hiện tại không nằm trong nhóm 16-21 thì mở luôn dropdown 24h.
+      if(!['16','17','18','19','20','21'].includes(defaultHour)){
+        timePickerExpanded[match.id] = {hour:true};
+      }
+
+      location.hash = '#/match/' + match.id + '/edit';
+      return; // hashchange sẽ tự gọi lại route() cho URL mới, không cần renderTabbar ở đây
+    }
+
+    if(parts[0] === 'home' || parts.length === 0){ Views.renderHome(); }
+    else if(parts[0] === 'fund'){ location.hash = '#/settings'; return; }
+    else if(parts[0] === 'members'){ Views.renderMembers(); }
+    else if(parts[0] === 'member' && parts[1]){ Views.renderMemberDetail(parts[1]); }
+    else if(parts[0] === 'matches'){ Views.renderMatchList(); }
+    else if(parts[0] === 'match' && parts[1] && parts[2] === 'edit'){ lastPreview = null; Views.renderMatchForm(parts[1]); }
+    else if(parts[0] === 'match' && parts[1] && parts[2] === 'result'){ Views.renderMatchResultSetup(parts[1]); }
+    else if(parts[0] === 'match' && parts[1]){ Views.renderMatchResult(parts[1]); }
+    else if(parts[0] === 'settings'){ Views.renderSettings(); }
+    else { Views.renderHome(); }
+
+    Views.renderTabbar();
+  },
+};
+
+window.addEventListener('hashchange', () => { window.scrollTo(0,0); Router.route(); });
+window.addEventListener('DOMContentLoaded', () => { applyTheme((Storage.get().settings || {}).theme || 'pitch'); Router.route(); });
+</script>
+</body>
+</html>
