@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<!-- v1.68 -->
+<!-- v1.71 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Galaxy Football Club — Quản lý quỹ đội bóng</title>
@@ -860,7 +860,7 @@ select option{background:#0A2E55;color:#fff;}
 .member-add-dock-row button{height:40px;border-radius:10px;border:1.5px solid var(--lux-gold);background:linear-gradient(145deg,#17324D,#071D36);color:#fff;font-weight:900;padding:0 14px;}
 .team-picker-search{width:100%;box-sizing:border-box;height:42px;margin:12px 0;border:1.5px solid var(--lux-gold);border-radius:11px;background:#102B45;color:#fff;padding:0 14px;font-size:14px;outline:none;} .team-picker-search::placeholder{color:#B7C5D4;} .picker-row.is-hidden{display:none !important;} .team-picker-no-result{height:40px;box-sizing:border-box;padding:10px;text-align:center;color:#B7C5D4;display:flex;align-items:center;justify-content:center;visibility:hidden;} .team-picker-no-result.is-visible{visibility:visible;} .team-picker-sheet{align-self:flex-start !important;margin-top:7vh !important;max-height:78vh !important;overflow:hidden !important;}
 .sheet.team-picker-sheet{overflow:hidden;}
-/* v1.68 — dashboard, lọc giao dịch theo cầu thủ, backup, sync status, chống double-click */
+/* v1.71 — dashboard, lọc giao dịch theo cầu thủ, backup, sync status, chống double-click, app refresh */
 .team-picker-search{scroll-margin:0 !important;-webkit-user-select:text;user-select:text;-webkit-tap-highlight-color:transparent;}
 .team-picker-sheet .team-picker-search:focus{outline:none !important;}
 @media(max-width:520px){
@@ -992,7 +992,7 @@ select option{background:#0A2E55;color:#fff;}
   .gfc-backup-btn{width:100%;margin-top:10px;}
   @media (max-width:520px){.gfc-dashboard-stats{gap:7px}.gfc-stat-card{padding:9px}.gfc-stat-card .stat-value{font-size:18px}.gfc-sync-card{align-items:flex-start;flex-direction:column;}}
 
-/* v1.68 — member financial summary, match team totals, safer actions, autosave/offline */
+/* v1.71 — member financial summary, match team totals, safer actions, autosave/offline */
 .gfc-member-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0;}
 .gfc-member-summary-card{padding:11px 12px;border:1px solid rgba(201,168,106,.35);border-radius:13px;background:linear-gradient(145deg,#0A2E55,#071D36);color:#fff;}
 .gfc-member-summary-card .label{font-size:11px;color:#AFC1D7;font-weight:800;}
@@ -1664,6 +1664,13 @@ let txFilterMember = "";
 let txFilterMemberSearch = "";
 const Views = {};
 
+Utils.normalizeSearchText = (value) => String(value ?? '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+  .toLowerCase().trim();
+
+
 Views.topbar = (title, backHash, rightHtml='') => `
   <div class="topbar">
     ${backHash ? `<button class="icon-btn" onclick="location.hash='${backHash}'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>` : `<div style="width:40px"></div>`}
@@ -1861,8 +1868,8 @@ Views.renderFund = () => {
 Views.renderMembers = () => {
   const app = document.getElementById('app');
   const allMembers = Utils.sortMembersByLastName(MemberService.listAll());
-  const q = memberSearch.trim().toLocaleLowerCase('vi');
-  const members = q ? allMembers.filter(m => m.name.toLocaleLowerCase('vi').includes(q)) : allMembers;
+  const q = Utils.normalizeSearchText(memberSearch);
+  const members = q ? allMembers.filter(m => Utils.normalizeSearchText(m.name).includes(q)) : allMembers;
   const settings = Storage.get().settings;
   const rows = members.map(m => {
     const balance = TransactionService.balanceOf(m.id);
@@ -1870,7 +1877,7 @@ Views.renderMembers = () => {
     if(balance <= 0) cls = 'balance-danger'; else if(balance < settings.warningThreshold) cls = 'balance-warn';
     const inactive = m.status !== 'active';
     const sub = inactive ? 'Tạm không tham gia' : (balance <= 0 ? 'Cần đóng quỹ' : (balance < settings.warningThreshold ? 'Sắp hết quỹ' : 'Đủ để quẩy'));
-    return `<div class="member-row ${inactive ? 'inactive' : ''}" data-member-name="${Utils.escapeHtml(m.name.toLocaleLowerCase('vi'))}" onclick="location.hash='#/member/${m.id}'"><div style="min-width:0; flex:1;"><div class="name">${Utils.escapeHtml(m.name)}</div><div class="sub">${sub}</div></div><div class="member-actions"><div class="balance-tag ${inactive ? '' : cls}">${Utils.formatCurrency(balance)}</div><button class="member-more" aria-label="Tùy chọn ${Utils.escapeHtml(m.name)}" onclick="event.stopPropagation(); Handlers.memberMenu('${m.id}')">⋮</button></div></div>`;
+    return `<div class="member-row ${inactive ? 'inactive' : ''}" data-member-name="${Utils.escapeHtml(Utils.normalizeSearchText(m.name))}" onclick="location.hash='#/member/${m.id}'"><div style="min-width:0; flex:1;"><div class="name">${Utils.escapeHtml(m.name)}</div><div class="sub">${sub}</div></div><div class="member-actions"><div class="balance-tag ${inactive ? '' : cls}">${Utils.formatCurrency(balance)}</div><button class="member-more" aria-label="Tùy chọn ${Utils.escapeHtml(m.name)}" onclick="event.stopPropagation(); Handlers.memberMenu('${m.id}')">⋮</button></div></div>`;
   }).join('');
   const addDock = !Auth.isAdmin() ? `` : (membersAddOpen ? `<div class="member-add-dock"><div class="member-add-dock-title">Thêm thành viên</div><div class="member-add-dock-row"><input id="inline-member-name" type="text" maxlength="60" placeholder="Nhập tên cầu thủ" autocomplete="off"><button type="button" onclick="Handlers.saveInlineMember()">Lưu</button></div></div>` : `<button type="button" class="member-add-luxury" onclick="Handlers.openAddMember()">＋ &nbsp; Thêm thành viên</button>`);
   app.innerHTML = `${Views.topbar('Thành viên', null)}<div class="view"><div class="section-title">Danh sách thành viên (${allMembers.length} cầu thủ)</div><div class="member-search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input id="member-search-input" type="text" value="${Utils.escapeHtml(memberSearch)}" placeholder="Tìm tên cầu thủ..." autocomplete="off" oninput="Handlers.setMemberSearch(this.value)"></div><div id="member-search-result" class="member-search-result" style="${q ? '' : 'display:none;'}">Tìm thấy ${members.length} cầu thủ</div><div id="member-list-results">${rows || `<div class="empty-state">${q ? 'Không tìm thấy cầu thủ phù hợp' : 'Chưa có thành viên nào'}</div>`}</div></div>${addDock}`;
@@ -2254,7 +2261,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.68</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.71</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2294,6 +2301,7 @@ Views.renderSettings = () => {
         <div class="gfc-sync-status"><span class="gfc-sync-dot ${window.FirebaseSync?.status==='ok'?'ok':window.FirebaseSync?.status==='saving'?'saving':window.FirebaseSync?.status==='error'?'error':''}"></span>${Utils.escapeHtml(window.FirebaseSync?.statusMessage || 'Chưa đồng bộ')}</div>
       </div>
       ${Auth.isAdmin() ? `<button class="btn btn-outline gfc-backup-btn" onclick="Handlers.downloadBackup()">⇩ &nbsp; Sao lưu dữ liệu</button>` : ''}
+      <button class="btn btn-outline gfc-backup-btn" onclick="Handlers.refreshApp()">↻ &nbsp; Cập nhật ứng dụng</button>
 
       <div class="section-title">Cảnh báo</div>
       <div class="card settings-compact-card warning-card-pro">
@@ -2332,7 +2340,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.68</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.71</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -2368,26 +2376,34 @@ const Handlers = new Proxy({
   addMemberPrompt(){this.openAddMember();},
   setMemberSearch(value){
     memberSearch = String(value ?? '');
-    const q = memberSearch.trim().toLocaleLowerCase('vi');
+    const q = Utils.normalizeSearchText(memberSearch);
     const list = document.getElementById('member-list-results');
     const result = document.getElementById('member-search-result');
     if(!list) return Views.renderMembers();
+
     const rows = [...list.querySelectorAll('.member-row')];
     let visible = 0;
     rows.forEach(row => {
       const name = row.getAttribute('data-member-name') || '';
       const show = !q || name.includes(q);
-      row.style.display = show ? '' : 'flex';
+      row.hidden = !show;
+      row.style.display = show ? '' : 'none';
       if(show) visible++;
     });
+
     if(result){
       result.style.display = q ? '' : 'none';
       result.textContent = `Tìm thấy ${visible} cầu thủ`;
     }
+
     let empty = list.querySelector('.member-search-empty');
     if(q && visible === 0){
-      if(!empty){ empty=document.createElement('div'); empty.className='empty-state member-search-empty'; list.appendChild(empty); }
-      empty.textContent='Không tìm thấy cầu thủ phù hợp';
+      if(!empty){
+        empty=document.createElement('div');
+        empty.className='empty-state member-search-empty';
+        empty.textContent='Không tìm thấy cầu thủ phù hợp';
+        list.appendChild(empty);
+      }
       empty.style.display='';
     }else if(empty){
       empty.style.display='none';
@@ -2401,7 +2417,7 @@ const Handlers = new Proxy({
     if(!Auth.isAdmin()) return false;
     const payload = {
       exportedAt: new Date().toISOString(),
-      appVersion: 'v1.68',
+      appVersion: 'v1.71',
       data: JSON.parse(JSON.stringify(Storage.get()))
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -2411,6 +2427,12 @@ const Handlers = new Proxy({
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
     Snackbar.show('Đã tải bản sao lưu dữ liệu');
+  },
+  refreshApp(){
+    const hash = location.hash || '';
+    const url = `${location.pathname}?app=1.69&r=${Date.now()}${hash}`;
+    Snackbar.show('Đang tải phiên bản mới...');
+    setTimeout(() => { window.location.replace(url); }, 120);
   },
   downloadQr(){
     const img=document.querySelector('.qr-image-wrap img');
@@ -2909,7 +2931,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.68</strong>
+          <strong>v1.71</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
