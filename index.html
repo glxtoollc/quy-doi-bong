@@ -1,3 +1,4 @@
+// v1.55
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -614,8 +615,8 @@
   .gfc-status-dot.ok{color:#52D68A;background:#52D68A;}
   .gfc-status-dot.warn{color:#FFC400;background:#FFC400;}
   .gfc-status-dot.danger{color:#FF6868;background:#FF6868;}
-  .gfc-alert-link{display:inline-flex;align-items:center;gap:6px;color:#FFC400!important;font-weight:800;}
-  .gfc-alert-link svg{width:18px;height:18px;filter:drop-shadow(0 0 5px rgba(255,196,0,.25));}
+  .gfc-alert-link{display:inline-flex;align-items:center;gap:5px;color:#FFC400!important;font-weight:800;white-space:nowrap;font-size:12px;}
+  .gfc-alert-link svg{width:16px;height:16px;filter:drop-shadow(0 0 5px rgba(255,196,0,.25));flex:0 0 16px;}
   .gfc-add{height:56px!important;font-size:17px!important;}
   .match-create-fab{left:50%!important;right:auto!important;transform:translateX(-50%)!important;width:min(250px,calc(100vw - 40px))!important;height:54px!important;border-radius:16px!important;background:linear-gradient(135deg,#0877F9,#0B5ED7)!important;color:#fff!important;border:1px solid #3C9BFF!important;font-size:17px!important;font-weight:900!important;box-shadow:0 8px 24px rgba(0,0,0,.35)!important;z-index:70!important;}
   .match-create-fab:active{transform:translateX(-50%) scale(.98)!important;}
@@ -831,6 +832,42 @@ input[type="text"],input[type="number"],input[type="date"],select{
 /* Native select dropdown cannot be fully themed by CSS in every browser, but its closed control is luxury. */
 select option{background:#0A2E55;color:#fff;}
 
+
+/* v1.55 polish */
+.gfc-card-title{font-size:13px !important;line-height:1.15 !important;white-space:nowrap;}
+.gfc-fund-value.fund-positive{color:#63D391 !important;}
+.gfc-fund-value.fund-negative{color:#FF6262 !important;}
+.team-result-winner{
+  border:1.5px solid var(--lux-gold) !important;
+  background:linear-gradient(145deg,rgba(201,168,106,.18),rgba(10,46,85,.96)) !important;
+  box-shadow:0 0 0 2px rgba(201,168,106,.12),0 10px 26px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.10) !important;
+}
+.team-result-winner h3{color:#FFE39A !important;}
+.team-result-winner h3.winner::after{content:"🏆" !important;filter:drop-shadow(0 0 5px rgba(226,194,122,.45));}
+.member-add-dock{
+  position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));
+  transform:translateX(-50%);z-index:999;width:min(300px,calc(100vw - 32px));
+  padding:10px;border:1.5px solid var(--lux-gold);border-radius:16px;
+  background:linear-gradient(145deg,#0A2E55,#071D36);
+  box-shadow:0 10px 28px rgba(0,0,0,.38);color:#fff;
+}
+.member-add-dock-title{font-size:13px;font-weight:900;margin-bottom:7px;color:#FFE39A;}
+.member-add-dock-row{display:flex;gap:7px;}
+.member-add-dock-row input{flex:1;min-width:0;height:40px;border-radius:10px;border:1.5px solid var(--lux-gold);background:#0A2E55 !important;color:#fff !important;padding:0 10px;font-size:14px;}
+.member-add-dock-row input::placeholder{color:#B7C5D4;}
+.member-add-dock-row button{height:40px;border-radius:10px;border:1.5px solid var(--lux-gold);background:linear-gradient(145deg,#17324D,#071D36);color:#fff;font-weight:900;padding:0 14px;}
+.team-picker-luxury{
+  margin:-20px -20px -26px;padding:20px 20px calc(26px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(145deg,#0A2E55,#071D36);color:#fff;min-height:100%;
+}
+.team-picker-luxury h3{color:#fff !important;}
+.team-picker-luxury .hint{color:#B7C5D4 !important;}
+@media(max-width:520px){
+  .gfc-card-title{font-size:12px !important;}
+  .gfc-alert-link{font-size:11px !important;}
+  .gfc-alert-link svg{width:15px;height:15px;flex-basis:15px;}
+}
+
 </style>
 </head>
 <body>
@@ -874,7 +911,7 @@ select option{background:#0A2E55;color:#fff;}
 /* =========================================================================
    QUỸ ĐỘI BÓNG — single-file web app
    Kiến trúc phân lớp trong cùng 1 file (không dùng framework):
-     Storage  -> đọc/ghi localStorage
+     Storage  -> Firebase (nguồn dữ liệu duy nhất)
      Utils    -> format tiền, ngày, id
      Services -> TOÀN BỘ logic nghiệp vụ + tính tiền (UI không tự tính)
      Views    -> chỉ render HTML & gọi Services
@@ -882,7 +919,6 @@ select option{background:#0A2E55;color:#fff;}
 
 /* ---------------------------- STORAGE ---------------------------- */
 const Storage = (() => {
-  const KEY = 'football_team_fund_v1';
   const SCHEMA_VERSION = 1;
 
   function defaultState(){
@@ -905,45 +941,11 @@ const Storage = (() => {
     };
   }
 
-  function load(){
-    try{
-      const raw = localStorage.getItem(KEY);
-      if(!raw) return defaultState();
-      const parsed = JSON.parse(raw);
-      const state = {
-        schemaVersion: parsed.schemaVersion || SCHEMA_VERSION,
-        members: Array.isArray(parsed.members) ? parsed.members : [],
-        transactions: Array.isArray(parsed.transactions) ? parsed.transactions : [],
-        matches: Array.isArray(parsed.matches) ? parsed.matches : [],
-        settings: {
-          ...defaultState().settings,
-          ...(parsed.settings || {}),
-          savedLocations: Array.isArray(parsed.settings?.savedLocations) ? parsed.settings.savedLocations : [],
-          // Luôn giữ 4 kèo nhanh theo đúng thứ tự yêu cầu, kể cả dữ liệu localStorage cũ.
-          ratioPresets: [
-            { losingShare: 70, winningShare: 30 },
-            { losingShare: 60, winningShare: 40 },
-            { losingShare: 50, winningShare: 50 },
-            { losingShare: 100, winningShare: 0 },
-          ],
-        },
-      };
-      // Bản cũ dùng mặc định 20.000đ. Đổi sang quy ước mới 200 = 200.000đ.
-      if(state.settings.warningThreshold === 200000) state.settings.warningThreshold = 20000;
-      if(!state.settings.theme) state.settings.theme = 'pitch';
-      return state;
-    }catch(e){
-      console.error('Lỗi đọc dữ liệu, dùng mặc định:', e);
-      return defaultState();
-    }
-  }
-
-  let state = load();
+  let state = defaultState();
 
   return {
     get(){ return state; },
     save(){
-      localStorage.setItem(KEY, JSON.stringify(state));
       if(window.FirebaseSync){
         window.FirebaseSync.save(state).catch(err => console.error('Firebase save error:', err));
       }
@@ -954,11 +956,25 @@ const Storage = (() => {
         const remote = await window.FirebaseSync.load();
         if(remote && this.isValidImport(remote)){
           delete remote.updatedAt;
-          state = remote;
-          localStorage.setItem(KEY, JSON.stringify(state));
+          state = {
+            ...defaultState(),
+            ...remote,
+            settings: {
+              ...defaultState().settings,
+              ...(remote.settings || {}),
+              savedLocations: Array.isArray(remote.settings?.savedLocations) ? remote.settings.savedLocations : [],
+              ratioPresets: [
+                { losingShare: 70, winningShare: 30 },
+                { losingShare: 60, winningShare: 40 },
+                { losingShare: 50, winningShare: 50 },
+                { losingShare: 100, winningShare: 0 },
+              ],
+            }
+          };
           return true;
         }
       }catch(e){ console.error('Firebase load error:', e); }
+      state = defaultState();
       return false;
     },
     replace(newState){ state = newState; this.save(); },
@@ -1446,7 +1462,7 @@ Views.renderHome = () => {
         <div class="card gfc-fund-card">
           <div class="gfc-fund-head"><span class="gfc-fund-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H20v13H6.5A2.5 2.5 0 0 1 4 15.5v-8Z"/><path d="M4 8h13.5A2.5 2.5 0 0 1 20 10.5v4H17a2 2 0 0 1 0-4h3"/><circle cx="17" cy="12.5" r=".7" fill="currentColor" stroke="none"/></svg></span><span class="gfc-fund-label">QUỸ ĐỘI BÓNG</span></div>
           <div class="gfc-fund-caption">Tổng quỹ hiện tại</div>
-          <div class="gfc-fund-value">${Utils.formatCurrency(totalFund)}</div>
+          <div class="gfc-fund-value ${totalFund < 0 ? "fund-negative" : "fund-positive"}">${Utils.formatCurrency(totalFund)}</div>
           <div class="gfc-fund-meta">Cập nhật lần cuối: ${lastFundUpdate}</div>
         </div>
       </div>
@@ -1524,8 +1540,8 @@ Views.renderMembers = () => {
     const sub = inactive ? 'Tạm không tham gia' : (balance <= 0 ? 'Cần đóng quỹ' : (balance < settings.warningThreshold ? 'Sắp hết quỹ' : 'Bình thường'));
     return `<div class="member-row ${inactive ? 'inactive' : ''}" onclick="location.hash='#/member/${m.id}'"><div style="min-width:0; flex:1;"><div class="name">${Utils.escapeHtml(m.name)}</div><div class="sub">${sub}</div></div><div class="member-actions"><div class="balance-tag ${inactive ? '' : cls}">${Utils.formatCurrency(balance)}</div><button class="member-more" aria-label="Tùy chọn ${Utils.escapeHtml(m.name)}" onclick="event.stopPropagation(); Handlers.memberMenu('${m.id}')">⋮</button></div></div>`;
   }).join('');
-  const addForm = membersAddOpen ? `<div class="member-add-inline"><div class="member-add-inline-title">Thêm thành viên</div><div class="member-add-inline-row"><input id="inline-member-name" type="text" maxlength="60" placeholder="Nhập tên cầu thủ" autocomplete="off"><button onclick="Handlers.saveInlineMember()">Thêm</button></div></div>` : '';
-  app.innerHTML = `${Views.topbar('Thành viên', null)}<div class="view"><div class="section-title">Danh sách thành viên (${members.length} cầu thủ)</div>${addForm}${rows || `<div class="empty-state">Chưa có thành viên nào</div>`}</div>${!membersAddOpen ? `<button type="button" class="member-add-luxury" onclick="Handlers.openAddMember()">＋ &nbsp; Thêm thành viên</button>` : ''}`;
+  const addDock = membersAddOpen ? `<div class="member-add-dock"><div class="member-add-dock-title">Thêm thành viên</div><div class="member-add-dock-row"><input id="inline-member-name" type="text" maxlength="60" placeholder="Nhập tên cầu thủ" autocomplete="off"><button type="button" onclick="Handlers.saveInlineMember()">Lưu</button></div></div>` : `<button type="button" class="member-add-luxury" onclick="Handlers.openAddMember()">＋ &nbsp; Thêm thành viên</button>`;
+  app.innerHTML = `${Views.topbar('Thành viên', null)}<div class="view"><div class="section-title">Danh sách thành viên (${members.length} cầu thủ)</div>${rows || `<div class="empty-state">Chưa có thành viên nào</div>`}</div>${addDock}`;
   if(membersAddOpen) setTimeout(()=>document.getElementById('inline-member-name')?.focus(),0);
 };
 
@@ -1744,7 +1760,7 @@ Views.renderMatchResultSetup = (matchId) => {
         <div class="section-title">Kết quả tính tiền</div>
         <div class="card">
           <div class="result-calc-grid">
-            <div class="result-calc-team"><div class="team-block"><h3 class="winner">Đội ${winningTeam==='team1'?'1':'2'} thắng</h3>${winningLines}</div></div>
+            <div class="result-calc-team team-result-winner"><div class="team-block"><h3 class="winner">Đội ${winningTeam==='team1'?'1':'2'} thắng</h3>${winningLines}</div></div>
             <div class="result-calc-team"><div class="team-block"><h3>Đội ${losingTeam==='team1'?'1':'2'} thua</h3>${losingLines}</div></div>
           </div>
           <div class="total-line"><span>Tổng đóng quỹ</span><span>${Utils.formatCurrency(totalCollected)}</span></div>
@@ -1821,7 +1837,7 @@ Views.renderMatchResult = (matchId) => {
 
       <div class="card">
         <div class="result-calc-grid">
-          <div class="result-calc-team">
+          <div class="result-calc-team team-result-winner">
             <h3 class="winner">Đội ${winningTeam==='team1'?'1':'2'} thắng</h3>
             ${winningLines}
           </div>
@@ -1928,7 +1944,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.41</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.55</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -2189,9 +2205,11 @@ const Handlers = {
         <span>${Utils.escapeHtml(m.name)}</span><span class="picker-add">＋</span>
       </div>`).join('');
     Dialogs.openSheet(`
-      <h3>Thêm vào ${team==='team1'?'Đội 1':'Đội 2'}</h3>
-      ${rows || `<div class="empty-state" style="padding:25px 10px;">Không còn thành viên đang tham gia đội bóng để chọn.</div>`}
-      <div class="hint" style="margin-top:10px;">Chỉ hiện người đang ở trạng thái tham gia. Người “tạm không tham gia” sẽ không xuất hiện.</div>
+      <div class="team-picker-luxury">
+        <h3>Thêm vào ${team==='team1'?'Đội 1':'Đội 2'}</h3>
+        ${rows || `<div class="empty-state" style="padding:25px 10px;background:transparent;color:#fff;">Không còn thành viên đang tham gia đội bóng để chọn.</div>`}
+        <div class="hint" style="margin-top:10px;">Chỉ hiện người đang ở trạng thái tham gia. Người “tạm không tham gia” sẽ không xuất hiện.</div>
+      </div>
     `);
   },
   pickMemberForTeam(matchId, team, memberId){
