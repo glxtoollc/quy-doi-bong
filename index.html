@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<!-- v1.65 -->
+<!-- v1.67 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Galaxy Football Club — Quản lý quỹ đội bóng</title>
@@ -860,7 +860,7 @@ select option{background:#0A2E55;color:#fff;}
 .member-add-dock-row button{height:40px;border-radius:10px;border:1.5px solid var(--lux-gold);background:linear-gradient(145deg,#17324D,#071D36);color:#fff;font-weight:900;padding:0 14px;}
 .team-picker-search{width:100%;box-sizing:border-box;height:42px;margin:12px 0;border:1.5px solid var(--lux-gold);border-radius:11px;background:#102B45;color:#fff;padding:0 14px;font-size:14px;outline:none;} .team-picker-search::placeholder{color:#B7C5D4;} .picker-row.is-hidden{display:none !important;} .team-picker-no-result{height:40px;box-sizing:border-box;padding:10px;text-align:center;color:#B7C5D4;display:flex;align-items:center;justify-content:center;visibility:hidden;} .team-picker-no-result.is-visible{visibility:visible;} .team-picker-sheet{align-self:flex-start !important;margin-top:7vh !important;max-height:78vh !important;overflow:hidden !important;}
 .sheet.team-picker-sheet{overflow:hidden;}
-/* v1.65 — thêm xóa giao dịch dành riêng cho admin */
+/* v1.67 — dashboard, lọc giao dịch theo cầu thủ, backup, sync status, chống double-click */
 .team-picker-search{scroll-margin:0 !important;-webkit-user-select:text;user-select:text;-webkit-tap-highlight-color:transparent;}
 .team-picker-sheet .team-picker-search:focus{outline:none !important;}
 @media(max-width:520px){
@@ -967,6 +967,31 @@ select option{background:#0A2E55;color:#fff;}
 @media(max-width:700px){
   .gfc-member-head>div:first-child{gap:9px!important;}
 }
+
+  /* v1.67 improvements */
+  .gfc-dashboard-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+  .gfc-stat-card{border:1px solid rgba(255,255,255,.12);border-radius:13px;padding:11px 12px;background:rgba(255,255,255,.035);cursor:pointer;}
+  .gfc-stat-card .stat-label{font-size:11px;color:#AFC1D7;font-weight:800;}
+  .gfc-stat-card .stat-value{font-size:21px;font-weight:900;margin-top:3px;}
+  .gfc-stat-card.paid .stat-value{color:#77D7A0;}
+  .gfc-stat-card.unpaid .stat-value{color:#FFC400;}
+  .gfc-sync-card{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .gfc-sync-status{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;}
+  .gfc-sync-dot{width:9px;height:9px;border-radius:50%;background:#AFC1D7;box-shadow:0 0 0 4px rgba(175,193,215,.08);}
+  .gfc-sync-dot.ok{background:#63D391;box-shadow:0 0 0 4px rgba(99,211,145,.10);}
+  .gfc-sync-dot.saving{background:#FFC400;box-shadow:0 0 0 4px rgba(255,196,0,.10);}
+  .gfc-sync-dot.error{background:#FF6262;box-shadow:0 0 0 4px rgba(255,98,98,.10);}
+  .tx-filter-member{grid-column:1 / -1;}
+  .tx-member-search-wrap{grid-column:1 / -1;position:relative;}
+  .tx-member-search{width:100%;height:42px;border-radius:11px;border:1px solid #477EAF;background:linear-gradient(145deg,#08284E,#061A34);color:#fff;padding:0 12px 0 38px;font-size:13px;font-weight:700;outline:none;box-sizing:border-box;}
+  .tx-member-search::placeholder{color:#AFC1D7;opacity:1;}
+  .tx-member-search:focus{border-color:var(--lux-gold);box-shadow:0 0 0 2px rgba(201,168,106,.12);}
+  .tx-member-search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none;opacity:.85;}
+  .tx-member-search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:0;border-radius:8px;background:rgba(255,255,255,.08);color:#fff;cursor:pointer;display:none;}
+  .tx-filter-empty{display:none;padding:18px 8px;text-align:center;color:#AFC1D7;font-size:13px;}
+  .gfc-backup-btn{width:100%;margin-top:10px;}
+  @media (max-width:520px){.gfc-dashboard-stats{gap:7px}.gfc-stat-card{padding:9px}.gfc-stat-card .stat-value{font-size:18px}.gfc-sync-card{align-items:flex-start;flex-direction:column;}}
+
 </style>
 </head>
 <body>
@@ -1000,12 +1025,33 @@ select option{background:#0A2E55;color:#fff;}
   window.FirebaseSync = {
     db,
     docRef: doc(db, 'appData', 'football_team_fund_v1'),
+    status: 'idle',
+    setStatus(status, message){
+      this.status = status;
+      this.statusMessage = message || (status === 'ok' ? 'Đã đồng bộ Firebase' : status === 'saving' ? 'Đang đồng bộ...' : status === 'error' ? 'Lỗi đồng bộ' : 'Chưa đồng bộ');
+      window.dispatchEvent(new CustomEvent('firebase-sync-status', { detail:{ status:this.status, message:this.statusMessage } }));
+    },
     async load(){
-      const snap = await getDoc(this.docRef);
-      return snap.exists() ? snap.data() : null;
+      this.setStatus('saving','Đang tải dữ liệu Firebase...');
+      try {
+        const snap = await getDoc(this.docRef);
+        this.setStatus('ok','Đã đồng bộ Firebase');
+        return snap.exists() ? snap.data() : null;
+      } catch(e){
+        this.setStatus('error','Không tải được dữ liệu Firebase');
+        throw e;
+      }
     },
     async save(state){
-      await setDoc(this.docRef, { ...state, updatedAt: new Date().toISOString() });
+      this.setStatus('saving','Đang đồng bộ Firebase...');
+      try {
+        await setDoc(this.docRef, { ...state, updatedAt: new Date().toISOString() });
+        this.setStatus('ok','Đã đồng bộ Firebase');
+        return true;
+      } catch(e){
+        this.setStatus('error','Lỗi đồng bộ Firebase');
+        throw e;
+      }
     }
   };
 
@@ -1164,6 +1210,7 @@ const Storage = (() => {
 
 /* ---------------------------- UTILS ---------------------------- */
 const Utils = {
+  normalizeSearch(value){ return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'d').toLowerCase().trim(); },
   memberAlphaKey(name){
     const parts = String(name || '').trim().replace(/\s+/g,' ').split(' ').filter(Boolean);
     return parts.length ? parts[parts.length - 1] : '';
@@ -1562,6 +1609,8 @@ let membersAddOpen = false;
 let memberSearch = "";
 let txFilterMonth = "";
 let txFilterYear = "";
+let txFilterMember = "";
+let txFilterMemberSearch = "";
 const Views = {};
 
 Views.topbar = (title, backHash, rightHtml='') => `
@@ -1615,6 +1664,11 @@ Views.renderHome = () => {
   const activeCount = members.filter(m=>m.status==='active').length;
   const lowCount = balances.filter(x=>x.balance>0 && x.balance<settings.warningThreshold).length;
   const dangerCount = balances.filter(x=>x.balance<=0).length;
+  const now = new Date();
+  const currentMonth = now.getMonth(), currentYear = now.getFullYear();
+  const paidThisMonth = new Set(Storage.get().transactions.filter(t => t.type === TransactionType.DEPOSIT).filter(t => { const d=new Date(t.createdAt); return d.getMonth()===currentMonth && d.getFullYear()===currentYear; }).map(t=>t.memberId));
+  const paidCount = members.filter(m=>paidThisMonth.has(m.id)).length;
+  const unpaidCount = Math.max(0, members.length - paidCount);
   const lastFundTx = [...Storage.get().transactions].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt))[0];
   const lastFundUpdate = lastFundTx ? Utils.formatDateTime(lastFundTx.createdAt) : 'Chưa có giao dịch';
 
@@ -1663,6 +1717,14 @@ Views.renderHome = () => {
           <div class="gfc-fund-caption">Tổng quỹ hiện tại</div>
           <div class="gfc-fund-value ${totalFund < 0 ? "fund-negative" : "fund-positive"}">${Utils.formatCurrency(totalFund)}</div>
           <div class="gfc-fund-meta">Cập nhật lần cuối: ${lastFundUpdate}</div>
+          <div class="gfc-dashboard-stats">
+            <div class="gfc-stat-card paid" onclick="location.hash='#/transactions'">
+              <div class="stat-label">ĐÃ ĐÓNG QUỸ THÁNG NÀY</div><div class="stat-value">${paidCount}/${members.length}</div>
+            </div>
+            <div class="gfc-stat-card unpaid" onclick="location.hash='#/members'">
+              <div class="stat-label">CHƯA ĐÓNG</div><div class="stat-value">${unpaidCount}</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2087,13 +2149,16 @@ Views.renderTransactions = () => {
   let txs = [...state.transactions].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
   if(txFilterMonth) txs = txs.filter(t=>String(new Date(t.createdAt).getMonth()+1)===txFilterMonth);
   if(txFilterYear) txs = txs.filter(t=>String(new Date(t.createdAt).getFullYear())===txFilterYear);
+  if(txFilterMember) txs = txs.filter(t=>t.memberId===txFilterMember);
   const rows = txs.map(t => {
     const member=members[t.memberId], plus=t.amount>=0;
+    const memberName=member?.name || 'Thành viên đã xóa';
     const adminDelete = Auth.isAdmin() ? `<button type="button" class="gfc-tx-delete" title="Xóa giao dịch" aria-label="Xóa giao dịch" onclick="event.stopPropagation(); Handlers.deleteTransactionPrompt('${t.id}')">🗑</button>` : '';
-    return `<div class="gfc-tx-row"><div class="gfc-tx-date">${Utils.formatDateTime(t.createdAt)}</div><div><div class="gfc-tx-member">${Utils.escapeHtml(member?.name || 'Thành viên đã xóa')}</div><div class="gfc-tx-note">${typeLabel[t.type] || t.type}</div></div><div class="gfc-tx-amount ${plus?'plus':'minus'}">${Utils.formatSigned(t.amount)}${adminDelete}</div></div>`;
+    return `<div class="gfc-tx-row" data-tx-member-name="${Utils.escapeHtml(memberName).toLowerCase()}"><div class="gfc-tx-date">${Utils.formatDateTime(t.createdAt)}</div><div><div class="gfc-tx-member">${Utils.escapeHtml(memberName)}</div><div class="gfc-tx-note">${typeLabel[t.type] || t.type}</div></div><div class="gfc-tx-amount ${plus?'plus':'minus'}">${Utils.formatSigned(t.amount)}${adminDelete}</div></div>`;
   }).join('');
   const months=['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
-  app.innerHTML = `${Views.topbar('Lịch sử giao dịch', null)}<div class="view"><div class="tx-filter-card"><select aria-label="Lọc theo tháng" onchange="Handlers.setTxMonth(this.value)"><option value="">Tháng — Tất cả</option>${months.map((m,i)=>`<option value="${i+1}" ${txFilterMonth===String(i+1)?'selected':''}>${m}</option>`).join('')}</select><select aria-label="Lọc theo năm" onchange="Handlers.setTxYear(this.value)"><option value="">Năm — Tất cả</option>${years.map(y=>`<option value="${y}" ${txFilterYear===String(y)?'selected':''}>${y}</option>`).join('')}</select></div><div class="card gfc-page-card"><div class="gfc-page-title"><span class="ico">↔</span> ${txs.length} giao dịch</div>${rows || `<div class="gfc-empty-page"><div class="empty-icon">▤</div><strong>Không có giao dịch phù hợp.</strong></div>`}</div></div>`;
+  app.innerHTML = `${Views.topbar('Lịch sử giao dịch', null)}<div class="view"><div class="tx-filter-card"><select aria-label="Lọc theo tháng" onchange="Handlers.setTxMonth(this.value)"><option value="">Tháng — Tất cả</option>${months.map((m,i)=>`<option value="${i+1}" ${txFilterMonth===String(i+1)?'selected':''}>${m}</option>`).join('')}</select><select aria-label="Lọc theo năm" onchange="Handlers.setTxYear(this.value)"><option value="">Năm — Tất cả</option>${years.map(y=>`<option value="${y}" ${txFilterYear===String(y)?'selected':''}>${y}</option>`).join('')}</select><div class="tx-member-search-wrap"><span class="tx-member-search-icon">🔍</span><input id="tx-member-search" class="tx-member-search" type="search" autocomplete="off" placeholder="Tìm tên cầu thủ..." value="${Utils.escapeHtml(txFilterMemberSearch)}" oninput="Handlers.setTxMemberSearch(this.value)"><button id="tx-member-search-clear" class="tx-member-search-clear" type="button" onclick="Handlers.clearTxMemberSearch()" aria-label="Xóa tìm kiếm">×</button></div></div><div class="card gfc-page-card"><div class="gfc-page-title"><span class="ico">↔</span> <span id="tx-count">${txs.length}</span> giao dịch</div><div id="tx-rows">${rows}</div><div id="tx-filter-empty" class="tx-filter-empty">Không tìm thấy giao dịch của cầu thủ này.</div>${!rows ? `<div class="gfc-empty-page"><div class="empty-icon">▤</div><strong>Không có giao dịch phù hợp.</strong></div>` : ''}</div></div>`;
+  Handlers.applyTxMemberSearch(txFilterMemberSearch);
 };
 
 /* ---- 5. ABOUT ---- */
@@ -2105,7 +2170,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.65</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.67</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2138,6 +2203,13 @@ Views.renderSettings = () => {
         </div>
         ${Auth.isAdmin() ? `<div><span class="admin-badge">● ADMIN</span><button class="admin-logout-btn" style="margin-left:7px;" onclick="Auth.logoutFromSettings()">Đăng xuất</button></div>` : `<button class="admin-login-btn" onclick="Auth.showLogin()">Đăng nhập</button>`}
       </div>
+
+      <div class="section-title">Đồng bộ & dữ liệu</div>
+      <div class="card settings-compact-card gfc-sync-card">
+        <div><div class="settings-label">Trạng thái dữ liệu</div><div class="hint">Firebase là nguồn dữ liệu dùng chung cho mọi thiết bị.</div></div>
+        <div class="gfc-sync-status"><span class="gfc-sync-dot ${window.FirebaseSync?.status==='ok'?'ok':window.FirebaseSync?.status==='saving'?'saving':window.FirebaseSync?.status==='error'?'error':''}"></span>${Utils.escapeHtml(window.FirebaseSync?.statusMessage || 'Chưa đồng bộ')}</div>
+      </div>
+      ${Auth.isAdmin() ? `<button class="btn btn-outline gfc-backup-btn" onclick="Handlers.downloadBackup()">⇩ &nbsp; Sao lưu dữ liệu</button>` : ''}
 
       <div class="section-title">Cảnh báo</div>
       <div class="card settings-compact-card warning-card-pro">
@@ -2176,7 +2248,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.65</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.67</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -2227,6 +2299,21 @@ const Handlers = new Proxy({
     const text="Tên Facebook không dấu + đóng quỹ tháng X";
     navigator.clipboard?.writeText(text).then(()=>Snackbar.show("Đã sao chép mẫu nội dung chuyển khoản")).catch(()=>Snackbar.show("Không thể sao chép tự động"));
   },
+  downloadBackup(){
+    if(!Auth.isAdmin()) return false;
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      appVersion: 'v1.67',
+      data: JSON.parse(JSON.stringify(Storage.get()))
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href=url; a.download=`Quy-Doi-Bong-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    Snackbar.show('Đã tải bản sao lưu dữ liệu');
+  },
   downloadQr(){
     const img=document.querySelector('.qr-image-wrap img');
     if(!img?.src){Snackbar.show('Không tìm thấy ảnh QR');return;}
@@ -2241,6 +2328,18 @@ const Handlers = new Proxy({
   setHomePage(page){homePage=Math.max(1,Number(page)||1);Views.renderHome();},
   setTxMonth(value){txFilterMonth=value;Views.renderTransactions();},
   setTxYear(value){txFilterYear=value;Views.renderTransactions();},
+  setTxMember(value){txFilterMember=value;Views.renderTransactions();},
+  setTxMemberSearch(value){txFilterMemberSearch=String(value||''); this.applyTxMemberSearch(txFilterMemberSearch); },
+  clearTxMemberSearch(){ txFilterMemberSearch=''; const input=document.getElementById('tx-member-search'); if(input){input.value='';input.focus();} this.applyTxMemberSearch(''); },
+  applyTxMemberSearch(value){
+    const q=Utils.normalizeSearch(value||'');
+    const rows=[...document.querySelectorAll('#tx-rows .gfc-tx-row')];
+    let visible=0;
+    rows.forEach(row=>{ const name=Utils.normalizeSearch(row.getAttribute('data-tx-member-name')||''); const show=!q || name.includes(q); row.style.display=show?'grid':'none'; if(show) visible++; });
+    const count=document.getElementById('tx-count'); if(count) count.textContent=visible;
+    const empty=document.getElementById('tx-filter-empty'); if(empty) empty.style.display=rows.length && visible===0?'block':'none';
+    const clear=document.getElementById('tx-member-search-clear'); if(clear) clear.style.display=value?'block':'none';
+  },
   depositPrompt(memberId){
     Dialogs.promptAmount('Đóng tiền vào quỹ', (amount) => {
       TransactionService.addDeposit(memberId, amount);
@@ -2646,7 +2745,7 @@ const Handlers = new Proxy({
     }, true);
   },
   cancelMatchPrompt(matchId){
-    Dialogs.confirm('Hủy trận đấu này? Toàn bộ giao dịch liên quan sẽ được hoàn tác, nhưng lịch sử vẫn được giữ lại.', () => {
+    Dialogs.confirm('Hủy trận đấu này? Tiền đã trừ sẽ được hoàn tiền cho các thành viên. Lịch sử giao dịch vẫn được giữ lại.', () => {
       MatchService.cancel(matchId);
       Snackbar.show('Đã hủy trận đấu');
       location.hash = '#/matches';
@@ -2693,7 +2792,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.62</strong>
+          <strong>v1.67</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
@@ -2712,12 +2811,16 @@ const Handlers = new Proxy({
       'openAddMember','saveInlineMember','depositPrompt','editDepositPrompt','deleteTransactionPrompt','memberMenu','renamePrompt','confirmSetStatus','deleteMemberPrompt',
       'setMatchDateText','toggleLocationPicker','chooseLocation','saveLocation','openDetailedTime','toggleHourPicker','toggleMinutePicker','chooseHour','setHourChoice','chooseMinute','setMinuteChoice',
       'setField','setFieldFee','addParticipant','removeParticipant','openTeamPicker','pickMemberForTeam','addGuestPrompt','toggleGuestPaidInForm','toggleGuestPaidInResult','setTeam','setRatio','customRatioPrompt',
-      'confirmLineup','backToMatchForm','setWinner','calculatePreview','confirmMatch','discardDraft','cancelMatchPrompt','setWarningThreshold','setTheme','editWarningThreshold','saveWarningThreshold'
+      'confirmLineup','backToMatchForm','setWinner','calculatePreview','confirmMatch','discardDraft','cancelMatchPrompt','setWarningThreshold','setTheme','editWarningThreshold','saveWarningThreshold','downloadBackup'
     ]);
     if (!mutating.has(prop)) return value;
     return function(...args){
       if (!Auth.requireAdmin()) return false;
-      return value.apply(this,args);
+      const lockKey = `__gfc_action_lock_${String(prop)}`;
+      if(window[lockKey]) return false;
+      window[lockKey] = true;
+      try { return value.apply(this,args); }
+      finally { setTimeout(() => { window[lockKey] = false; }, 700); }
     };
   }
 });
@@ -2726,6 +2829,10 @@ document.addEventListener('click', (event) => {
   if(!event.target.closest('.time-picker')){
     document.querySelectorAll('.time-picker-menu').forEach(m => { m.hidden = true; });
   }
+});
+window.addEventListener('firebase-sync-status', () => {
+  const hash = location.hash || '#/home';
+  if(hash.startsWith('#/settings')) { try { Views.renderSettings(); } catch(e) {} }
 });
 
 /* ---------------------------- ROUTER ---------------------------- */
