@@ -1,7 +1,7 @@
-// v1.55
 <!DOCTYPE html>
 <html lang="vi">
 <head>
+<!-- v1.56 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Galaxy Football Club — Quản lý quỹ đội bóng</title>
@@ -868,6 +868,25 @@ select option{background:#0A2E55;color:#fff;}
   .gfc-alert-link svg{width:15px;height:15px;flex-basis:15px;}
 }
 
+
+  .admin-login-icon{text-align:center;font-size:34px;margin-bottom:6px;}
+  .admin-login h3{margin:0 0 6px;text-align:center;color:#fff;}
+  .admin-login .hint{text-align:center;line-height:1.5;margin:0 0 14px;color:#B9C8DA;}
+  .admin-login-error{margin:8px 0;padding:9px 10px;border-radius:10px;background:rgba(198,40,40,.18);border:1px solid #C62828;color:#FFB4B4;font-size:12px;font-weight:700;}
+  .admin-status-card{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .admin-status-copy{min-width:0;}
+  .admin-status-title{font-size:14px;font-weight:900;color:#fff;}
+  .admin-status-sub{font-size:12px;color:#B9C8DA;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .admin-login-btn,.admin-logout-btn{height:40px;min-width:108px;border-radius:12px;border:1px solid var(--lux-gold);background:linear-gradient(135deg,#17324D,#071D36);color:#fff;font-weight:900;cursor:pointer;}
+  .admin-badge{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;border:1px solid #5FCB91;background:rgba(95,203,145,.12);color:#8FF0B8;font-size:11px;font-weight:900;}
+  @media(max-width:520px){
+    .section-title{font-size:14px !important;}
+    .gfc-alert-link{font-size:10px !important;gap:4px !important;}
+    .gfc-alert-link svg{width:14px !important;height:14px !important;flex-basis:14px !important;}
+    .admin-status-card{align-items:flex-start;}
+    .admin-login-btn,.admin-logout-btn{min-width:96px;}
+  }
+
 </style>
 </head>
 <body>
@@ -882,6 +901,7 @@ select option{background:#0A2E55;color:#fff;}
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
   import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCjLraPUczO961vdBy56OsuV8-0YhsX-yY",
@@ -894,6 +914,8 @@ select option{background:#0A2E55;color:#fff;}
   };
   const firebaseApp = initializeApp(firebaseConfig);
   const db = getFirestore(firebaseApp);
+  const auth = getAuth(firebaseApp);
+  window.FirebaseAuth = auth;
 
   window.FirebaseSync = {
     db,
@@ -916,6 +938,73 @@ select option{background:#0A2E55;color:#fff;}
      Services -> TOÀN BỘ logic nghiệp vụ + tính tiền (UI không tự tính)
      Views    -> chỉ render HTML & gọi Services
    ========================================================================= */
+
+/* ---------------------------- AUTH / ADMIN ---------------------------- */
+const Auth = (() => {
+  let currentUser = null;
+  let ready = false;
+  const state = { currentUser: null, ready: false };
+  const notify = () => {
+    document.body.classList.toggle('is-admin', !!currentUser);
+    if (ready) {
+      try { Views.renderTabbar(); } catch(e) {}
+      const hash = location.hash || '#/home';
+      if (hash.startsWith('#/settings')) { try { Views.renderSettings(); } catch(e) {} }
+    }
+  };
+  onAuthStateChanged(auth, user => {
+    currentUser = user || null;
+    state.currentUser = currentUser;
+    ready = true;
+    state.ready = true;
+    notify();
+  });
+  function isAdmin(){ return !!currentUser; }
+  function login(email, password){ return signInWithEmailAndPassword(auth, email.trim(), password); }
+  function logout(){ return signOut(auth); }
+  function requireAdmin(){
+    if (isAdmin()) return true;
+    showLogin();
+    return false;
+  }
+  function showLogin(){
+    Dialogs.openDialog(`
+      <div class="admin-login">
+        <div class="admin-login-icon">🔐</div>
+        <h3>Đăng nhập quản trị</h3>
+        <p class="hint">Thành viên đội bóng chỉ xem dữ liệu. Chỉ tài khoản quản trị mới được chỉnh sửa.</p>
+        <div class="field"><label>Email</label><input id="admin-email" type="email" autocomplete="username" placeholder="Email quản trị"></div>
+        <div class="field"><label>Mật khẩu</label><input id="admin-password" type="password" autocomplete="current-password" placeholder="Mật khẩu"></div>
+        <div id="admin-login-error" class="admin-login-error" hidden></div>
+        <div class="dialog-actions">
+          <button class="btn btn-outline" onclick="Dialogs.closeDialog()">Hủy</button>
+          <button class="btn btn-primary" onclick="Auth.loginFromDialog()">Đăng nhập</button>
+        </div>
+      </div>`);
+    setTimeout(() => document.getElementById('admin-email')?.focus(), 50);
+  }
+  async function loginFromDialog(){
+    const email = document.getElementById('admin-email')?.value || '';
+    const password = document.getElementById('admin-password')?.value || '';
+    const err = document.getElementById('admin-login-error');
+    if (!email || !password) { if(err){err.hidden=false;err.textContent='Nhập đủ email và mật khẩu.';} return; }
+    try {
+      await login(email, password);
+      Dialogs.closeDialog();
+      Snackbar.show('Đăng nhập quản trị thành công');
+      Router.route();
+    } catch(e) {
+      if(err){err.hidden=false;err.textContent='Đăng nhập thất bại. Kiểm tra email và mật khẩu.';}
+    }
+  }
+  async function logoutFromSettings(){
+    await logout();
+    Snackbar.show('Đã đăng xuất quản trị');
+    Router.route();
+  }
+  return { get currentUser(){return currentUser;}, get ready(){return ready;}, isAdmin, requireAdmin, showLogin, login, loginFromDialog, logout, logoutFromSettings };
+})();
+window.Auth = Auth;
 
 /* ---------------------------- STORAGE ---------------------------- */
 const Storage = (() => {
@@ -946,6 +1035,7 @@ const Storage = (() => {
   return {
     get(){ return state; },
     save(){
+      if(!Auth.isAdmin()) return false;
       if(window.FirebaseSync){
         window.FirebaseSync.save(state).catch(err => console.error('Firebase save error:', err));
       }
@@ -1473,7 +1563,7 @@ Views.renderHome = () => {
             <div class="gfc-card-title"><span class="ico">♟</span> DANH SÁCH THÀNH VIÊN (${members.length} cầu thủ)</div>
             <div class="alert gfc-alert-link"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/></svg>Cảnh báo ${lowCount+dangerCount>0?`(${lowCount+dangerCount})`:''}</div>
           </div>
-          <button class="gfc-home-add" onclick="Handlers.openAddMember()">＋ &nbsp; Thêm thành viên</button>
+          ${Auth.isAdmin() ? `<button class="gfc-home-add" onclick="Handlers.openAddMember()">＋ &nbsp; Thêm thành viên</button>` : ''}
         </div>
         <div class="gfc-table">
           ${members.length ? `<div class="gfc-table-head"><span>#</span><span>Tên thành viên</span><span>Số dư (VNĐ)</span><span>Trạng thái</span></div>${rows}` : `<div class="gfc-empty"><div class="empty-icon">♙♙♙</div><strong>Chưa có thành viên nào.</strong><span>Nhấn “Thêm thành viên” để bắt đầu.</span></div>`}
@@ -1540,7 +1630,7 @@ Views.renderMembers = () => {
     const sub = inactive ? 'Tạm không tham gia' : (balance <= 0 ? 'Cần đóng quỹ' : (balance < settings.warningThreshold ? 'Sắp hết quỹ' : 'Bình thường'));
     return `<div class="member-row ${inactive ? 'inactive' : ''}" onclick="location.hash='#/member/${m.id}'"><div style="min-width:0; flex:1;"><div class="name">${Utils.escapeHtml(m.name)}</div><div class="sub">${sub}</div></div><div class="member-actions"><div class="balance-tag ${inactive ? '' : cls}">${Utils.formatCurrency(balance)}</div><button class="member-more" aria-label="Tùy chọn ${Utils.escapeHtml(m.name)}" onclick="event.stopPropagation(); Handlers.memberMenu('${m.id}')">⋮</button></div></div>`;
   }).join('');
-  const addDock = membersAddOpen ? `<div class="member-add-dock"><div class="member-add-dock-title">Thêm thành viên</div><div class="member-add-dock-row"><input id="inline-member-name" type="text" maxlength="60" placeholder="Nhập tên cầu thủ" autocomplete="off"><button type="button" onclick="Handlers.saveInlineMember()">Lưu</button></div></div>` : `<button type="button" class="member-add-luxury" onclick="Handlers.openAddMember()">＋ &nbsp; Thêm thành viên</button>`;
+  const addDock = !Auth.isAdmin() ? `` : (membersAddOpen ? `<div class="member-add-dock"><div class="member-add-dock-title">Thêm thành viên</div><div class="member-add-dock-row"><input id="inline-member-name" type="text" maxlength="60" placeholder="Nhập tên cầu thủ" autocomplete="off"><button type="button" onclick="Handlers.saveInlineMember()">Lưu</button></div></div>` : `<button type="button" class="member-add-luxury" onclick="Handlers.openAddMember()">＋ &nbsp; Thêm thành viên</button>`);
   app.innerHTML = `${Views.topbar('Thành viên', null)}<div class="view"><div class="section-title">Danh sách thành viên (${members.length} cầu thủ)</div>${rows || `<div class="empty-state">Chưa có thành viên nào</div>`}</div>${addDock}`;
   if(membersAddOpen) setTimeout(()=>document.getElementById('inline-member-name')?.focus(),0);
 };
@@ -1882,7 +1972,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.41</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.56</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -1907,6 +1997,15 @@ Views.renderSettings = () => {
   app.innerHTML = `
     ${Views.topbar('Cài đặt', null)}
     <div class="view">
+      <div class="section-title">Quản trị</div>
+      <div class="card settings-compact-card admin-status-card">
+        <div class="admin-status-copy">
+          <div class="admin-status-title">${Auth.isAdmin() ? 'Đang ở chế độ quản trị' : 'Chế độ chỉ xem'}</div>
+          <div class="admin-status-sub">${Auth.isAdmin() ? Utils.escapeHtml(Auth.currentUser?.email || 'Tài khoản quản trị') : 'Đăng nhập để chỉnh sửa quỹ, thành viên và trận đấu.'}</div>
+        </div>
+        ${Auth.isAdmin() ? `<div><span class="admin-badge">● ADMIN</span><button class="admin-logout-btn" style="margin-left:7px;" onclick="Auth.logoutFromSettings()">Đăng xuất</button></div>` : `<button class="admin-login-btn" onclick="Auth.showLogin()">Đăng nhập</button>`}
+      </div>
+
       <div class="section-title">Cảnh báo</div>
       <div class="card settings-compact-card warning-card-pro">
         <div class="warning-card-head">
@@ -1944,7 +2043,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.55</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.56</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -1953,7 +2052,7 @@ Views.renderSettings = () => {
 };
 
 /* ---------------------------- HANDLERS (gắn lên window, gọi từ onclick) ---------------------------- */
-const Handlers = {
+const Handlers = new Proxy({
   openAddMember(){
     membersAddOpen=true;
     if((location.hash||'#/home')!=='#/members') location.hash='#/members'; else Views.renderMembers();
@@ -2367,7 +2466,7 @@ const Handlers = {
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.41</strong>
+          <strong>v1.56</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
@@ -2378,7 +2477,23 @@ const Handlers = {
         <button class="btn-confirm" onclick="Dialogs.closeDialog()">Đóng</button>
       </div>`);
   },
-};
+}, {
+  get(target, prop, receiver){
+    const value = Reflect.get(target, prop, receiver);
+    if (typeof value !== 'function') return value;
+    const mutating = new Set([
+      'openAddMember','saveInlineMember','depositPrompt','editDepositPrompt','memberMenu','renamePrompt','confirmSetStatus','deleteMemberPrompt',
+      'setMatchDateText','toggleLocationPicker','chooseLocation','saveLocation','openDetailedTime','toggleHourPicker','toggleMinutePicker','chooseHour','setHourChoice','chooseMinute','setMinuteChoice',
+      'setField','setFieldFee','addParticipant','removeParticipant','openTeamPicker','pickMemberForTeam','addGuestPrompt','toggleGuestPaidInForm','toggleGuestPaidInResult','setTeam','setRatio','customRatioPrompt',
+      'confirmLineup','backToMatchForm','setWinner','calculatePreview','confirmMatch','discardDraft','cancelMatchPrompt','setWarningThreshold','setTheme','editWarningThreshold','saveWarningThreshold'
+    ]);
+    if (!mutating.has(prop)) return value;
+    return function(...args){
+      if (!Auth.requireAdmin()) return false;
+      return value.apply(this,args);
+    };
+  }
+});
 
 document.addEventListener('click', (event) => {
   if(!event.target.closest('.time-picker')){
@@ -2393,6 +2508,7 @@ const Router = {
     const parts = hash.split('/').filter(Boolean);
 
     if(parts[0] === 'match' && parts[1] === 'new'){
+      if(!Auth.requireAdmin()){ location.hash='#/home'; return; }
       const settings = Storage.get().settings;
       const defaultTime = '17:00';
       const defaultHour = '17';
@@ -2433,7 +2549,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   applyTheme((Storage.get().settings || {}).theme || 'pitch');
   const loaded = await Storage.loadFromFirebase();
   applyTheme((Storage.get().settings || {}).theme || 'pitch');
-  Router.route();
+  const waitAuth = () => Auth.ready ? Router.route() : setTimeout(waitAuth, 40);
+  waitAuth();
   if(loaded) Snackbar.show('Đã tải dữ liệu từ Firebase');
 });
 </script>
