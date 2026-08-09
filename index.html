@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<!-- v1.60 -->
+<!-- v1.61 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Galaxy Football Club — Quản lý quỹ đội bóng</title>
@@ -856,7 +856,7 @@ select option{background:#0A2E55;color:#fff;}
 .member-add-dock-row input{flex:1;min-width:0;height:40px;border-radius:10px;border:1.5px solid var(--lux-gold);background:#0A2E55 !important;color:#fff !important;padding:0 10px;font-size:14px;}
 .member-add-dock-row input::placeholder{color:#B7C5D4;}
 .member-add-dock-row button{height:40px;border-radius:10px;border:1.5px solid var(--lux-gold);background:linear-gradient(145deg,#17324D,#071D36);color:#fff;font-weight:900;padding:0 14px;}
-.team-picker-luxury{
+.team-picker-search{width:100%;box-sizing:border-box;height:42px;margin:12px 0;border:1.5px solid var(--lux-gold);border-radius:11px;background:#102B45;color:#fff;padding:0 14px;font-size:14px;outline:none;} .team-picker-search::placeholder{color:#B7C5D4;} .picker-row.is-hidden{display:none !important;} .team-picker-no-result{padding:20px 10px;text-align:center;color:#B7C5D4;} .team-picker-luxury{
   margin:-20px -20px -26px;padding:20px 20px calc(26px + env(safe-area-inset-bottom,0px));
   background:linear-gradient(145deg,#0A2E55,#071D36);color:#fff;min-height:100%;
 }
@@ -2068,7 +2068,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.60</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.61</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2139,7 +2139,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.60</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.61</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -2438,16 +2438,33 @@ const Handlers = new Proxy({
     const chosen = new Set(match.participants.map(p=>`${p.refType}:${p.refId}`));
     const available = MemberService.list().filter(m => !chosen.has(`member:${m.id}`));
     const rows = available.map(m => `
-      <div class="picker-row" onclick="Handlers.pickMemberForTeam('${matchId}','${team}','${m.id}')">
+      <div class="picker-row" data-picker-member-name="${Utils.escapeHtml(m.name).toLocaleLowerCase('vi')}" onclick="Handlers.pickMemberForTeam('${matchId}','${team}','${m.id}')">
         <span>${Utils.escapeHtml(m.name)}</span><span class="picker-add">＋</span>
       </div>`).join('');
     Dialogs.openSheet(`
       <div class="team-picker-luxury">
         <h3>Thêm vào ${team==='team1'?'Đội 1':'Đội 2'}</h3>
-        ${rows || `<div class="empty-state" style="padding:25px 10px;background:transparent;color:#fff;">Không còn thành viên đang tham gia đội bóng để chọn.</div>`}
+        <input id="team-picker-search" class="team-picker-search" type="text" placeholder="🔍 Tìm tên cầu thủ..." autocomplete="off" oninput="Handlers.filterTeamPicker(this.value)">
+        <div id="team-picker-list">${rows || `<div class="empty-state" style="padding:25px 10px;background:transparent;color:#fff;">Không còn thành viên đang tham gia đội bóng để chọn.</div>`}</div>
+        <div id="team-picker-no-result" class="team-picker-no-result" style="display:none;">Không tìm thấy cầu thủ phù hợp.</div>
         <div class="hint" style="margin-top:10px;">Chỉ hiện người đang ở trạng thái tham gia. Người “tạm không tham gia” sẽ không xuất hiện.</div>
       </div>
     `);
+  },
+  filterTeamPicker(value){
+    const q=String(value??'').trim().toLocaleLowerCase('vi');
+    const list=document.getElementById('team-picker-list');
+    const noResult=document.getElementById('team-picker-no-result');
+    if(!list) return;
+    const rows=[...list.querySelectorAll('.picker-row')];
+    let visible=0;
+    rows.forEach(row=>{
+      const name=row.getAttribute('data-picker-member-name')||'';
+      const show=!q||name.includes(q);
+      row.classList.toggle('is-hidden',!show);
+      if(show) visible++;
+    });
+    if(noResult) noResult.style.display=(q && visible===0)?'block':'none';
   },
   pickMemberForTeam(matchId, team, memberId){
     MatchService.addParticipant(matchId,'member',memberId);
@@ -2604,7 +2621,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.60</strong>
+          <strong>v1.61</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
