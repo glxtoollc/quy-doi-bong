@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<!-- v1.63 -->
+<!-- v1.64 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Galaxy Football Club — Quản lý quỹ đội bóng</title>
@@ -858,6 +858,13 @@ select option{background:#0A2E55;color:#fff;}
 .member-add-dock-row button{height:40px;border-radius:10px;border:1.5px solid var(--lux-gold);background:linear-gradient(145deg,#17324D,#071D36);color:#fff;font-weight:900;padding:0 14px;}
 .team-picker-search{width:100%;box-sizing:border-box;height:42px;margin:12px 0;border:1.5px solid var(--lux-gold);border-radius:11px;background:#102B45;color:#fff;padding:0 14px;font-size:14px;outline:none;} .team-picker-search::placeholder{color:#B7C5D4;} .picker-row.is-hidden{display:none !important;} .team-picker-no-result{height:40px;box-sizing:border-box;padding:10px;text-align:center;color:#B7C5D4;display:flex;align-items:center;justify-content:center;visibility:hidden;} .team-picker-no-result.is-visible{visibility:visible;} .team-picker-sheet{align-self:flex-start !important;margin-top:7vh !important;max-height:78vh !important;overflow:hidden !important;}
 .sheet.team-picker-sheet{overflow:hidden;}
+/* v1.64 — search được focus ngay khi mở; giữ input ổn định khi bàn phím iPhone xuất hiện */
+.team-picker-search{scroll-margin:0 !important;-webkit-user-select:text;user-select:text;-webkit-tap-highlight-color:transparent;}
+.team-picker-sheet .team-picker-search:focus{outline:none !important;}
+@media(max-width:520px){
+  .team-picker-sheet{max-height:78vh !important;}
+  .team-picker-luxury{overscroll-behavior:contain;}
+}
 .team-picker-luxury{
   margin:-20px -20px -26px;padding:20px 20px calc(26px + env(safe-area-inset-bottom,0px));
   background:linear-gradient(145deg,#0A2E55,#071D36);color:#fff;min-height:100%;
@@ -2084,7 +2091,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.63</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.64</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2155,7 +2162,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.63</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.64</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -2466,7 +2473,24 @@ const Handlers = new Proxy({
         <div class="hint" style="margin-top:10px;">Chỉ hiện người đang ở trạng thái tham gia. Người “tạm không tham gia” sẽ không xuất hiện.</div>
       </div>
     `);
-    document.getElementById('sheet-content').parentElement.classList.add('team-picker-sheet');
+    const teamPickerSheet = document.getElementById('sheet-content').parentElement;
+    teamPickerSheet.classList.add('team-picker-sheet');
+
+    // v1.64: Khi mở khung chọn cầu thủ từ thao tác tap/click,
+    // focus search ngay trong cùng user gesture để iPhone/Safari bật bàn phím.
+    // preventScroll giúp không kéo trang/khung chọn cầu thủ nhảy vị trí.
+    const teamPickerSearch = document.getElementById('team-picker-search');
+    if(teamPickerSearch){
+      try {
+        teamPickerSearch.focus({preventScroll:true});
+      } catch(e) {
+        teamPickerSearch.focus();
+      }
+      try {
+        const len = teamPickerSearch.value.length;
+        teamPickerSearch.setSelectionRange(len, len);
+      } catch(e) {}
+    }
   },
   filterTeamPicker(value){
     const q=String(value??'').trim().toLocaleLowerCase('vi');
