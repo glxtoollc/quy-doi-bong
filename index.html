@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<!-- v1.67 -->
+<!-- v1.68 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Galaxy Football Club — Quản lý quỹ đội bóng</title>
@@ -860,7 +860,7 @@ select option{background:#0A2E55;color:#fff;}
 .member-add-dock-row button{height:40px;border-radius:10px;border:1.5px solid var(--lux-gold);background:linear-gradient(145deg,#17324D,#071D36);color:#fff;font-weight:900;padding:0 14px;}
 .team-picker-search{width:100%;box-sizing:border-box;height:42px;margin:12px 0;border:1.5px solid var(--lux-gold);border-radius:11px;background:#102B45;color:#fff;padding:0 14px;font-size:14px;outline:none;} .team-picker-search::placeholder{color:#B7C5D4;} .picker-row.is-hidden{display:none !important;} .team-picker-no-result{height:40px;box-sizing:border-box;padding:10px;text-align:center;color:#B7C5D4;display:flex;align-items:center;justify-content:center;visibility:hidden;} .team-picker-no-result.is-visible{visibility:visible;} .team-picker-sheet{align-self:flex-start !important;margin-top:7vh !important;max-height:78vh !important;overflow:hidden !important;}
 .sheet.team-picker-sheet{overflow:hidden;}
-/* v1.67 — dashboard, lọc giao dịch theo cầu thủ, backup, sync status, chống double-click */
+/* v1.68 — dashboard, lọc giao dịch theo cầu thủ, backup, sync status, chống double-click */
 .team-picker-search{scroll-margin:0 !important;-webkit-user-select:text;user-select:text;-webkit-tap-highlight-color:transparent;}
 .team-picker-sheet .team-picker-search:focus{outline:none !important;}
 @media(max-width:520px){
@@ -968,7 +968,7 @@ select option{background:#0A2E55;color:#fff;}
   .gfc-member-head>div:first-child{gap:9px!important;}
 }
 
-  /* v1.67 improvements */
+  /* v1.68 improvements */
   .gfc-dashboard-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
   .gfc-stat-card{border:1px solid rgba(255,255,255,.12);border-radius:13px;padding:11px 12px;background:rgba(255,255,255,.035);cursor:pointer;}
   .gfc-stat-card .stat-label{font-size:11px;color:#AFC1D7;font-weight:800;}
@@ -991,6 +991,19 @@ select option{background:#0A2E55;color:#fff;}
   .tx-filter-empty{display:none;padding:18px 8px;text-align:center;color:#AFC1D7;font-size:13px;}
   .gfc-backup-btn{width:100%;margin-top:10px;}
   @media (max-width:520px){.gfc-dashboard-stats{gap:7px}.gfc-stat-card{padding:9px}.gfc-stat-card .stat-value{font-size:18px}.gfc-sync-card{align-items:flex-start;flex-direction:column;}}
+
+/* v1.68 — member financial summary, match team totals, safer actions, autosave/offline */
+.gfc-member-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0;}
+.gfc-member-summary-card{padding:11px 12px;border:1px solid rgba(201,168,106,.35);border-radius:13px;background:linear-gradient(145deg,#0A2E55,#071D36);color:#fff;}
+.gfc-member-summary-card .label{font-size:11px;color:#AFC1D7;font-weight:800;}
+.gfc-member-summary-card .value{font-size:17px;font-weight:900;margin-top:3px;color:#fff;}
+.gfc-member-match-list{display:flex;flex-direction:column;gap:8px;}
+.gfc-member-match-item{display:flex;justify-content:space-between;gap:10px;padding:11px 12px;border:1px solid rgba(201,168,106,.28);border-radius:12px;background:linear-gradient(145deg,#0A2E55,#071D36);color:#fff;cursor:pointer;}
+.gfc-member-match-item .meta{font-size:11px;color:#AFC1D7;margin-top:3px;}
+.gfc-team-total{margin-top:9px;padding-top:9px;border-top:1px solid rgba(255,255,255,.14);display:flex;justify-content:space-between;font-weight:900;color:#FFE39A;font-size:12px;}
+.gfc-danger-action-note{font-size:11px;color:#FFB4B4;margin-top:5px;}
+.gfc-offline-badge{font-size:11px;font-weight:900;color:#FFD76A;}
+@media(max-width:520px){.gfc-member-summary{gap:7px}.gfc-member-summary-card{padding:9px}.gfc-member-summary-card .value{font-size:15px}.gfc-member-match-item{padding:10px;font-size:12px;}}
 
 </style>
 </head>
@@ -1025,6 +1038,7 @@ select option{background:#0A2E55;color:#fff;}
   window.FirebaseSync = {
     db,
     docRef: doc(db, 'appData', 'football_team_fund_v1'),
+    queueKey: 'quy-doi-bong-firebase-pending-v1',
     status: 'idle',
     setStatus(status, message){
       this.status = status;
@@ -1043,17 +1057,42 @@ select option{background:#0A2E55;color:#fff;}
       }
     },
     async save(state){
+      const payload = { ...state, updatedAt: new Date().toISOString() };
+      try { localStorage.setItem(this.queueKey, JSON.stringify(payload)); } catch(e) {}
+      if(navigator.onLine === false){
+        this.setStatus('saving','Đang chờ mạng để đồng bộ...');
+        return false;
+      }
       this.setStatus('saving','Đang đồng bộ Firebase...');
       try {
-        await setDoc(this.docRef, { ...state, updatedAt: new Date().toISOString() });
+        await setDoc(this.docRef, payload);
+        try { localStorage.removeItem(this.queueKey); } catch(e) {}
         this.setStatus('ok','Đã đồng bộ Firebase');
         return true;
       } catch(e){
-        this.setStatus('error','Lỗi đồng bộ Firebase');
+        this.setStatus('error','Chưa đồng bộ — dữ liệu đã lưu tạm trên máy');
         throw e;
+      }
+    },
+    async flushPending(){
+      if(navigator.onLine === false) return false;
+      let pending=null;
+      try { pending=JSON.parse(localStorage.getItem(this.queueKey)||'null'); } catch(e) {}
+      if(!pending) return false;
+      try {
+        this.setStatus('saving','Đang đồng bộ dữ liệu chờ...');
+        await setDoc(this.docRef, pending);
+        localStorage.removeItem(this.queueKey);
+        this.setStatus('ok','Đã đồng bộ Firebase');
+        return true;
+      } catch(e){
+        this.setStatus('error','Chưa đồng bộ — sẽ thử lại khi có mạng');
+        return false;
       }
     }
   };
+  window.addEventListener('online', () => { window.FirebaseSync.flushPending().then(()=>{ try { Router.route(); } catch(e) {} }); });
+  window.addEventListener('offline', () => window.FirebaseSync.setStatus('saving','Mất mạng — đang lưu tạm trên máy'));
 
   'use strict';
 /* =========================================================================
@@ -1162,9 +1201,11 @@ const Storage = (() => {
     get(){ return state; },
     save(){
       if(!Auth.isAdmin()) return false;
+      try { localStorage.setItem('quy-doi-bong-local-cache-v1', JSON.stringify(state)); } catch(e) {}
       if(window.FirebaseSync){
         window.FirebaseSync.save(state).catch(err => console.error('Firebase save error:', err));
       }
+      return true;
     },
     async loadFromFirebase(){
       if(!window.FirebaseSync) return false;
@@ -1196,7 +1237,17 @@ const Storage = (() => {
           }
           return true;
         }
-      }catch(e){ console.error('Firebase load error:', e); }
+      }catch(e){
+        console.error('Firebase load error:', e);
+        try {
+          const cached = JSON.parse(localStorage.getItem('quy-doi-bong-local-cache-v1')||'null');
+          if(cached && this.isValidImport(cached)){
+            state = { ...defaultState(), ...cached, settings:{...defaultState().settings,...(cached.settings||{})} };
+            window.FirebaseSync.setStatus('saving','Đang dùng dữ liệu lưu tạm — chờ đồng bộ');
+            return true;
+          }
+        } catch(err) {}
+      }
       state = defaultState();
       return false;
     },
@@ -1351,7 +1402,7 @@ const TransactionService = {
     return this._push({ id: Utils.genId(), memberId, type: TransactionType.MATCH_COST, amount: -Math.abs(amount), matchId, note: 'Chi phí trận đấu', reversed: false, createdAt: new Date().toISOString() });
   },
   addReversal(memberId, originalAmount, matchId){
-    return this._push({ id: Utils.genId(), memberId, type: TransactionType.REVERSAL, amount: -originalAmount, matchId, note: 'Hoàn tác trận đấu', createdAt: new Date().toISOString() });
+    return this._push({ id: Utils.genId(), memberId, type: TransactionType.REVERSAL, amount: -originalAmount, matchId, note: 'Hoàn tiền', createdAt: new Date().toISOString() });
   },
   reverseMatch(matchId){
     // Chỉ hoàn tác những match_cost CHƯA từng được hoàn tác trước đó,
@@ -1840,6 +1891,12 @@ Views.renderMemberDetail = (memberId) => {
   else if(balance < settings.warningThreshold) cls = 'balance-warn';
 
   const typeLabel = { deposit:'Đóng quỹ', match_cost:'Chi phí trận đấu', adjustment:'Điều chỉnh', reversal:'Hoàn tiền' };
+  const deposits = txs.filter(t => t.type === TransactionType.DEPOSIT && t.amount > 0);
+  const matchCosts = txs.filter(t => t.type === TransactionType.MATCH_COST && t.amount < 0);
+  const paidTotal = deposits.reduce((sum,t)=>sum+t.amount,0);
+  const matchTotal = matchCosts.reduce((sum,t)=>sum+Math.abs(t.amount),0);
+  const paidMonths = new Set(deposits.map(t=>{const d=new Date(t.createdAt);return `${d.getFullYear()}-${d.getMonth()+1}`;})).size;
+  const playedMatches = [...new Map(matchCosts.map(t=>[t.matchId,t])).values()].map(t=>MatchService.get(t.matchId)).filter(Boolean).filter(m=>m.status===MatchStatus.COMPLETED).sort((a,b)=>new Date(b.date+'T'+(b.time||'00:00'))-new Date(a.date+'T'+(a.time||'00:00')));
 
   const txRows = txs.map(t => `
     <div class="person-line" ${t.type==='deposit' ? `style="cursor:pointer;" onclick="Handlers.editDepositPrompt('${memberId}','${t.id}',${t.amount})"` : ''}>
@@ -1857,6 +1914,16 @@ Views.renderMemberDetail = (memberId) => {
           <button class="btn btn-primary btn-block" onclick="Handlers.depositPrompt('${memberId}')">Đóng tiền</button>
         </div>
       </div>
+
+      <div class="gfc-member-summary">
+        <div class="gfc-member-summary-card"><div class="label">Đã đóng quỹ</div><div class="value">${Utils.formatCurrency(paidTotal)}</div></div>
+        <div class="gfc-member-summary-card"><div class="label">Số tháng đã đóng</div><div class="value">${paidMonths} tháng</div></div>
+        <div class="gfc-member-summary-card"><div class="label">Đã đá</div><div class="value">${playedMatches.length} trận</div></div>
+        <div class="gfc-member-summary-card"><div class="label">Đã trừ tiền trận</div><div class="value">${Utils.formatCurrency(matchTotal)}</div></div>
+      </div>
+
+      <div class="section-title">Các trận đã đá</div>
+      <div class="card">${playedMatches.length ? `<div class="gfc-member-match-list">${playedMatches.map(m=>{const tx=matchCosts.find(t=>t.matchId===m.id);return `<div class="gfc-member-match-item" onclick="location.hash='#/match/${m.id}'"><div><strong>${Utils.escapeHtml(m.location||'Trận đấu')}</strong><div class="meta">${Utils.formatMatchDate(m.date)} ${m.time||''} · ${m.status===MatchStatus.CANCELLED?'Đã hủy':'Đã hoàn thành'}</div></div><strong>${Utils.formatCurrency(Math.abs(tx?.amount||0))}</strong></div>`;}).join('')}</div>` : `<div class="empty-state">Chưa có trận đấu nào được tính tiền.</div>`}</div>
 
       <div class="section-title">Lịch sử giao dịch</div>
       <div class="card">${txRows || `<div class="empty-state">Chưa có giao dịch nào</div>`}</div>
@@ -1896,6 +1963,13 @@ Views.renderMatchForm = (matchId) => {
   const app = document.getElementById('app');
   const match = MatchService.get(matchId);
   if(!match){ location.hash = '#/matches'; return; }
+  const localDraft = DraftService.get(matchId);
+  const draftNewer = localDraft && Number(localDraft.savedAt||0) > new Date(match.updatedAt||match.createdAt||0).getTime();
+  if(draftNewer){
+    if(localDraft.location != null) match.location = localDraft.location;
+    if(localDraft.fieldFeeText != null){ const fv=parseInt(localDraft.fieldFeeText,10); if(!isNaN(fv)) match.fieldFee=fv*1000; }
+    if(localDraft.dateText){ const iso=Utils.parseMatchDate(localDraft.dateText); if(iso) match.date=iso; }
+  }
 
   const team1 = match.participants.filter(p=>p.team==='team1');
   const team2 = match.participants.filter(p=>p.team==='team2');
@@ -1917,7 +1991,7 @@ Views.renderMatchForm = (matchId) => {
   app.innerHTML = `
     ${Views.topbar(match.status === MatchStatus.COMPLETED ? 'Sửa trận đấu' : 'Tạo trận đấu', '#/matches')}
     <div class="view">
-      <div class="section-title">Thông tin trận</div>
+      <div class="section-title">Thông tin trận</div><div class="hint gfc-offline-badge" style="margin:-6px 0 10px;">✓ Tự động lưu khi đang nhập · dùng được cả khi mạng chập chờn</div>
       <div class="card">
         <div class="match-date-time-row">
         <div class="field match-time-field">
@@ -1960,13 +2034,13 @@ Views.renderMatchForm = (matchId) => {
             })()}
           </div>
         </div>
-        <div class="field match-date-field"><label>Ngày</label><input type="text" inputmode="numeric" maxlength="10" value="${Utils.formatMatchDate(match.date)}" placeholder="dd/mm/yyyy" onchange="Handlers.setMatchDateText('${matchId}',this.value)" onblur="Handlers.setMatchDateText('${matchId}',this.value)"></div>
+        <div class="field match-date-field"><label>Ngày</label><input type="text" inputmode="numeric" maxlength="10" value="${Utils.formatMatchDate(match.date)}" placeholder="dd/mm/yyyy" oninput="Handlers.autoSaveMatchField('${matchId}','dateText',this.value)" onchange="Handlers.setMatchDateText('${matchId}',this.value)" onblur="Handlers.setMatchDateText('${matchId}',this.value)"></div>
         </div>
         <div class="field">
           <label>Sân:</label>
           <div class="lux-location-picker" id="location-picker-${matchId}">
             <div class="lux-location-input-row">
-              <input type="text" id="location-input-${matchId}" value="${Utils.escapeHtml(match.location||'')}" placeholder="Gõ tên sân..." autocomplete="off" onchange="Handlers.setField('${matchId}','location',this.value)">
+              <input type="text" id="location-input-${matchId}" value="${Utils.escapeHtml(match.location||'')}" placeholder="Gõ tên sân..." autocomplete="off" oninput="Handlers.autoSaveMatchField('${matchId}','location',this.value)" onchange="Handlers.setField('${matchId}','location',this.value)">
               <button type="button" class="lux-location-toggle" onclick="event.stopPropagation(); Handlers.toggleLocationPicker('${matchId}')">⌄</button>
             </div>
             <div class="lux-location-menu" id="location-menu-${matchId}" hidden>
@@ -1975,7 +2049,7 @@ Views.renderMatchForm = (matchId) => {
             </div>
           </div>
         </div>
-        <div class="field" style="margin-bottom:0;"><label>Tiền sân (VNĐ)</label><input type="number" value="${match.fieldFee ? Math.round(match.fieldFee / 1000) : ''}" inputmode="numeric" placeholder="VD: 350 = 350.000 VNĐ" onchange="Handlers.setFieldFee('${matchId}',this.value)"></div>
+        <div class="field" style="margin-bottom:0;"><label>Tiền sân (VNĐ)</label><input type="number" value="${match.fieldFee ? Math.round(match.fieldFee / 1000) : ''}" inputmode="numeric" placeholder="VD: 350 = 350.000 VNĐ" oninput="Handlers.autoSaveMatchField('${matchId}','fieldFeeText',this.value)" onchange="Handlers.setFieldFee('${matchId}',this.value)"></div>
       </div>
 
       <div class="section-title">Chọn đội hình</div>
@@ -2035,14 +2109,18 @@ Views.renderMatchResultSetup = (matchId) => {
     } else {
       const winningTeam = match.winningTeam;
       const losingTeam = winningTeam === 'team1' ? 'team2' : 'team1';
-      const winningLines = perPersonAmounts.filter(p=>p.team===winningTeam).map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
-      const losingLines = perPersonAmounts.filter(p=>p.team===losingTeam).map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+      const winningPeople = perPersonAmounts.filter(p=>p.team===winningTeam);
+      const losingPeople = perPersonAmounts.filter(p=>p.team===losingTeam);
+      const winningLines = winningPeople.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+      const losingLines = losingPeople.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+      const winningTotal = winningPeople.reduce((s,p)=>s+p.amount,0);
+      const losingTotal = losingPeople.reduce((s,p)=>s+p.amount,0);
       calculationHtml = `
         <div class="section-title">Kết quả tính tiền</div>
         <div class="card">
           <div class="result-calc-grid">
-            <div class="result-calc-team team-result-winner"><div class="team-block"><h3 class="winner">Đội ${winningTeam==='team1'?'1':'2'} thắng</h3>${winningLines}</div></div>
-            <div class="result-calc-team"><div class="team-block"><h3>Đội ${losingTeam==='team1'?'1':'2'} thua</h3>${losingLines}</div></div>
+            <div class="result-calc-team team-result-winner"><div class="team-block"><h3 class="winner">Đội ${winningTeam==='team1'?'1':'2'} thắng</h3>${winningLines}<div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(winningTotal)}</span></div></div></div>
+            <div class="result-calc-team"><div class="team-block"><h3>Đội ${losingTeam==='team1'?'1':'2'} thua</h3>${losingLines}<div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(losingTotal)}</span></div></div></div>
           </div>
           <div class="total-line"><span>Tổng đóng quỹ</span><span>${Utils.formatCurrency(totalCollected)}</span></div>
           <div class="hint">Tiền sân: ${Utils.formatCurrency(match.fieldFee)} — tổng đóng có thể nhỉnh hơn do làm tròn lên từng người.</div>
@@ -2102,8 +2180,12 @@ Views.renderMatchResult = (matchId) => {
   };
   const winningTeam = match.winningTeam;
   const losingTeam = winningTeam === 'team1' ? 'team2' : 'team1';
-  const winningLines = match.perPersonAmounts.filter(p=>p.team===winningTeam).map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${guestTag(p)}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
-  const losingLines = match.perPersonAmounts.filter(p=>p.team===losingTeam).map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${guestTag(p)}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+  const winningPeople = match.perPersonAmounts.filter(p=>p.team===winningTeam);
+  const losingPeople = match.perPersonAmounts.filter(p=>p.team===losingTeam);
+  const winningLines = winningPeople.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${guestTag(p)}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+  const losingLines = losingPeople.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${guestTag(p)}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+  const winningTotal = winningPeople.reduce((s,p)=>s+p.amount,0);
+  const losingTotal = losingPeople.reduce((s,p)=>s+p.amount,0);
   const total = match.perPersonAmounts.reduce((s,p)=>s+p.amount, 0);
 
   app.innerHTML = `
@@ -2121,10 +2203,12 @@ Views.renderMatchResult = (matchId) => {
           <div class="result-calc-team team-result-winner">
             <h3 class="winner">Đội ${winningTeam==='team1'?'1':'2'} thắng</h3>
             ${winningLines}
+            <div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(winningTotal)}</span></div>
           </div>
           <div class="result-calc-team">
             <h3>Đội ${losingTeam==='team1'?'1':'2'} thua</h3>
             ${losingLines}
+            <div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(losingTotal)}</span></div>
           </div>
         </div>
         <div class="total-line"><span>Tổng đóng quỹ</span><span>${Utils.formatCurrency(total)}</span></div>
@@ -2170,7 +2254,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.67</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.68</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2248,12 +2332,26 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.67</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.68</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
     </div>
   `;
+};
+
+/* ---------------------------- LOCAL DRAFT / OFFLINE ---------------------------- */
+const DraftService = {
+  key(matchId){ return `quy-doi-bong-draft-${matchId}`; },
+  save(matchId, patch){
+    try {
+      const match=MatchService.get(matchId); if(!match) return;
+      const prev=JSON.parse(localStorage.getItem(this.key(matchId))||'{}');
+      localStorage.setItem(this.key(matchId), JSON.stringify({...prev,...patch, savedAt:Date.now()}));
+    } catch(e) {}
+  },
+  clear(matchId){ try { localStorage.removeItem(this.key(matchId)); } catch(e) {} },
+  get(matchId){ try { return JSON.parse(localStorage.getItem(this.key(matchId))||'null'); } catch(e){ return null; } },
 };
 
 /* ---------------------------- HANDLERS (gắn lên window, gọi từ onclick) ---------------------------- */
@@ -2303,7 +2401,7 @@ const Handlers = new Proxy({
     if(!Auth.isAdmin()) return false;
     const payload = {
       exportedAt: new Date().toISOString(),
-      appVersion: 'v1.67',
+      appVersion: 'v1.68',
       data: JSON.parse(JSON.stringify(Storage.get()))
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -2442,6 +2540,7 @@ const Handlers = new Proxy({
       return;
     }
     MatchService.update(matchId, {date: iso});
+    DraftService.save(matchId, {date: iso});
     Views.renderMatchForm(matchId);
   },
   toggleLocationPicker(matchId){
@@ -2527,7 +2626,9 @@ const Handlers = new Proxy({
     }
 
     const minute = String(match.time||'').slice(3,5) || '00';
-    MatchService.update(matchId, { time: `${String(value).padStart(2,'0')}:${minute}` });
+    const nextTime = `${String(value).padStart(2,'0')}:${minute}`;
+    MatchService.update(matchId, { time: nextTime });
+    DraftService.save(matchId, {time: nextTime});
     lastPreview = null;
     Views.renderMatchForm(matchId);
   },
@@ -2556,7 +2657,9 @@ const Handlers = new Proxy({
     if(!/^([0-5][0-9])$/.test(minute)) return;
     const hour = String(match.time||'').slice(0,2) || '16';
 
-    MatchService.update(matchId, { time: `${hour}:${minute}` });
+    const nextTime = `${hour}:${minute}`;
+    MatchService.update(matchId, { time: nextTime });
+    DraftService.save(matchId, {time: nextTime});
     lastPreview = null;
     Views.renderMatchForm(matchId);
   },
@@ -2564,14 +2667,19 @@ const Handlers = new Proxy({
     // Tương thích dữ liệu/UI cũ.
     Handlers.chooseMinute(matchId, value);
   },
+  autoSaveMatchField(matchId, field, value){
+    DraftService.save(matchId, {[field]: value});
+  },
   setField(matchId, field, value){
     MatchService.update(matchId, { [field]: value });
+    DraftService.save(matchId, {[field]: value});
     lastPreview = null;
     Views.renderMatchForm(matchId);
   },
   setFieldFee(matchId, value){
     const v = parseInt(value, 10);
     MatchService.update(matchId, { fieldFee: isNaN(v) ? 0 : v * 1000 });
+    DraftService.save(matchId, {fieldFee: isNaN(v) ? 0 : v * 1000});
     lastPreview = null;
     Views.renderMatchForm(matchId);
   },
@@ -2581,9 +2689,15 @@ const Handlers = new Proxy({
     Views.renderMatchForm(matchId);
   },
   removeParticipant(matchId, refType, refId){
-    MatchService.removeParticipant(matchId, refType, refId);
-    lastPreview = null;
-    Views.renderMatchForm(matchId);
+    const match=MatchService.get(matchId);
+    if(!match) return;
+    const p=match.participants.find(x=>x.refType===refType && x.refId===refId);
+    const name=refType==='member' ? (MemberService.get(refId)?.name || 'cầu thủ') : (match.guests.find(g=>g.id===refId)?.name || 'khách');
+    Dialogs.confirm(`Bỏ ${name} khỏi trận đấu?`, () => {
+      MatchService.removeParticipant(matchId, refType, refId);
+      lastPreview = null;
+      Views.renderMatchForm(matchId);
+    }, true);
   },
   openTeamPicker(matchId, team){
     const match = MatchService.get(matchId);
@@ -2732,6 +2846,7 @@ const Handlers = new Proxy({
     const res = MatchService.confirm(matchId);
     if(!res.ok){ Dialogs.alert(res.errors.join('\n')); return; }
     lastPreview = null;
+    DraftService.clear(matchId);
     Snackbar.show('Đã lưu trận đấu');
     location.hash = '#/match/' + matchId;
   },
@@ -2739,6 +2854,7 @@ const Handlers = new Proxy({
     Dialogs.confirm('Xóa bản nháp này? Thao tác không thể hoàn tác.', () => {
       const state = Storage.get();
       state.matches = state.matches.filter(m => m.id !== matchId);
+      DraftService.clear(matchId);
       Storage.save();
       Snackbar.show('Đã xóa bản nháp');
       location.hash = '#/matches';
@@ -2747,6 +2863,7 @@ const Handlers = new Proxy({
   cancelMatchPrompt(matchId){
     Dialogs.confirm('Hủy trận đấu này? Tiền đã trừ sẽ được hoàn tiền cho các thành viên. Lịch sử giao dịch vẫn được giữ lại.', () => {
       MatchService.cancel(matchId);
+      DraftService.clear(matchId);
       Snackbar.show('Đã hủy trận đấu');
       location.hash = '#/matches';
     }, true);
@@ -2792,7 +2909,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.67</strong>
+          <strong>v1.68</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
