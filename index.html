@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<!-- v1.64 -->
+<!-- v1.65 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Galaxy Football Club — Quản lý quỹ đội bóng</title>
@@ -408,6 +408,8 @@
   .gfc-tx-amount{text-align:right;font-weight:900;font-size:14px;}
   .gfc-tx-amount.plus{color:#77D7A0;}
   .gfc-tx-amount.minus{color:#FF7B7B;}
+  .gfc-tx-delete{margin-left:8px;width:28px;height:28px;border:1px solid rgba(255,123,123,.55);border-radius:9px;background:rgba(198,40,40,.12);color:#FF9B9B;font-size:13px;line-height:1;cursor:pointer;vertical-align:middle;}
+  .gfc-tx-delete:hover{background:rgba(198,40,40,.24);border-color:#FF7B7B;}
   .gfc-empty-page{padding:50px 18px;text-align:center;color:#B9C8DA;}
   .gfc-empty-page .empty-icon{font-size:48px;margin-bottom:10px;}
   .gfc-about-hero{text-align:center;padding:28px 10px 20px;}
@@ -858,7 +860,7 @@ select option{background:#0A2E55;color:#fff;}
 .member-add-dock-row button{height:40px;border-radius:10px;border:1.5px solid var(--lux-gold);background:linear-gradient(145deg,#17324D,#071D36);color:#fff;font-weight:900;padding:0 14px;}
 .team-picker-search{width:100%;box-sizing:border-box;height:42px;margin:12px 0;border:1.5px solid var(--lux-gold);border-radius:11px;background:#102B45;color:#fff;padding:0 14px;font-size:14px;outline:none;} .team-picker-search::placeholder{color:#B7C5D4;} .picker-row.is-hidden{display:none !important;} .team-picker-no-result{height:40px;box-sizing:border-box;padding:10px;text-align:center;color:#B7C5D4;display:flex;align-items:center;justify-content:center;visibility:hidden;} .team-picker-no-result.is-visible{visibility:visible;} .team-picker-sheet{align-self:flex-start !important;margin-top:7vh !important;max-height:78vh !important;overflow:hidden !important;}
 .sheet.team-picker-sheet{overflow:hidden;}
-/* v1.64 — search được focus ngay khi mở; giữ input ổn định khi bàn phím iPhone xuất hiện */
+/* v1.65 — thêm xóa giao dịch dành riêng cho admin */
 .team-picker-search{scroll-margin:0 !important;-webkit-user-select:text;user-select:text;-webkit-tap-highlight-color:transparent;}
 .team-picker-sheet .team-picker-search:focus{outline:none !important;}
 @media(max-width:520px){
@@ -1277,6 +1279,14 @@ const TransactionService = {
     return this._push({ id: Utils.genId(), memberId, type: TransactionType.ADJUSTMENT, amount: signedAmount, matchId: null, note: note || 'Điều chỉnh', createdAt: new Date().toISOString() });
   },
   getById(txId){ return Storage.get().transactions.find(t => t.id === txId); },
+  delete(txId){
+    const state = Storage.get();
+    const index = state.transactions.findIndex(t => t.id === txId);
+    if(index < 0) return false;
+    state.transactions.splice(index, 1);
+    Storage.save();
+    return true;
+  },
   /** Sửa số tiền một giao dịch NẠP TIỀN đã tạo trước đó — không sửa đè bản ghi cũ,
    * mà tạo thêm 1 giao dịch điều chỉnh (chênh lệch) để giữ nguyên lịch sử. */
   correctDeposit(txId, newAmount){
@@ -1767,7 +1777,7 @@ Views.renderMemberDetail = (memberId) => {
   if(balance <= 0) cls = 'balance-danger';
   else if(balance < settings.warningThreshold) cls = 'balance-warn';
 
-  const typeLabel = { deposit:'Đóng quỹ', match_cost:'Chi phí trận đấu', adjustment:'Điều chỉnh', reversal:'Hoàn tác trận đấu' };
+  const typeLabel = { deposit:'Đóng quỹ', match_cost:'Chi phí trận đấu', adjustment:'Điều chỉnh', reversal:'Hoàn tiền' };
 
   const txRows = txs.map(t => `
     <div class="person-line" ${t.type==='deposit' ? `style="cursor:pointer;" onclick="Handlers.editDepositPrompt('${memberId}','${t.id}',${t.amount})"` : ''}>
@@ -2071,13 +2081,17 @@ Views.renderTransactions = () => {
   const app = document.getElementById('app');
   const state = Storage.get();
   const members = Object.fromEntries(state.members.map(m => [m.id, m]));
-  const typeLabel = { deposit:'Đóng quỹ', match_cost:'Chi phí trận đấu', adjustment:'Điều chỉnh', reversal:'Hoàn tác trận đấu' };
+  const typeLabel = { deposit:'Đóng quỹ', match_cost:'Chi phí trận đấu', adjustment:'Điều chỉnh', reversal:'Hoàn tiền' };
   const dates = state.transactions.map(t=>new Date(t.createdAt)).filter(d=>!isNaN(d));
   const years = [...new Set(dates.map(d=>d.getFullYear()))].sort((a,b)=>b-a);
   let txs = [...state.transactions].sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
   if(txFilterMonth) txs = txs.filter(t=>String(new Date(t.createdAt).getMonth()+1)===txFilterMonth);
   if(txFilterYear) txs = txs.filter(t=>String(new Date(t.createdAt).getFullYear())===txFilterYear);
-  const rows = txs.map(t => { const member=members[t.memberId], plus=t.amount>=0; return `<div class="gfc-tx-row"><div class="gfc-tx-date">${Utils.formatDateTime(t.createdAt)}</div><div><div class="gfc-tx-member">${Utils.escapeHtml(member?.name || 'Thành viên đã xóa')}</div><div class="gfc-tx-note">${typeLabel[t.type] || t.type}</div></div><div class="gfc-tx-amount ${plus?'plus':'minus'}">${Utils.formatSigned(t.amount)}</div></div>`; }).join('');
+  const rows = txs.map(t => {
+    const member=members[t.memberId], plus=t.amount>=0;
+    const adminDelete = Auth.isAdmin() ? `<button type="button" class="gfc-tx-delete" title="Xóa giao dịch" aria-label="Xóa giao dịch" onclick="event.stopPropagation(); Handlers.deleteTransactionPrompt('${t.id}')">🗑</button>` : '';
+    return `<div class="gfc-tx-row"><div class="gfc-tx-date">${Utils.formatDateTime(t.createdAt)}</div><div><div class="gfc-tx-member">${Utils.escapeHtml(member?.name || 'Thành viên đã xóa')}</div><div class="gfc-tx-note">${typeLabel[t.type] || t.type}</div></div><div class="gfc-tx-amount ${plus?'plus':'minus'}">${Utils.formatSigned(t.amount)}${adminDelete}</div></div>`;
+  }).join('');
   const months=['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
   app.innerHTML = `${Views.topbar('Lịch sử giao dịch', null)}<div class="view"><div class="tx-filter-card"><select aria-label="Lọc theo tháng" onchange="Handlers.setTxMonth(this.value)"><option value="">Tháng — Tất cả</option>${months.map((m,i)=>`<option value="${i+1}" ${txFilterMonth===String(i+1)?'selected':''}>${m}</option>`).join('')}</select><select aria-label="Lọc theo năm" onchange="Handlers.setTxYear(this.value)"><option value="">Năm — Tất cả</option>${years.map(y=>`<option value="${y}" ${txFilterYear===String(y)?'selected':''}>${y}</option>`).join('')}</select></div><div class="card gfc-page-card"><div class="gfc-page-title"><span class="ico">↔</span> ${txs.length} giao dịch</div>${rows || `<div class="gfc-empty-page"><div class="empty-icon">▤</div><strong>Không có giao dịch phù hợp.</strong></div>`}</div></div>`;
 };
@@ -2091,7 +2105,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.64</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.65</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2162,7 +2176,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.64</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.65</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -2258,6 +2272,23 @@ const Handlers = new Proxy({
       }, true);
     };
   },
+  deleteTransactionPrompt(txId){
+    if(!Auth.isAdmin()) return false;
+    const tx = TransactionService.getById(txId);
+    if(!tx) return;
+    const member = MemberService.get(tx.memberId);
+    const memberName = member?.name || 'Thành viên đã xóa';
+    const labelMap = { deposit:'Đóng quỹ', match_cost:'Chi phí trận đấu', adjustment:'Điều chỉnh', reversal:'Hoàn tiền' };
+    const reason = tx.note || labelMap[tx.type] || tx.type;
+    Dialogs.confirm(`Xóa giao dịch của ${Utils.escapeHtml(memberName)}?\n${Utils.escapeHtml(reason)} — ${Utils.formatSigned(tx.amount)}\n\nSố dư quỹ của thành viên cũng sẽ thay đổi theo.`, () => {
+      if(!Auth.isAdmin()) return;
+      if(TransactionService.delete(txId)){
+        Snackbar.show('Đã xóa giao dịch');
+        Views.renderTransactions();
+      }
+    }, true);
+  },
+
   memberMenu(memberId){
     const member = MemberService.get(memberId);
     if(!member) return;
@@ -2678,7 +2709,7 @@ const Handlers = new Proxy({
     const value = Reflect.get(target, prop, receiver);
     if (typeof value !== 'function') return value;
     const mutating = new Set([
-      'openAddMember','saveInlineMember','depositPrompt','editDepositPrompt','memberMenu','renamePrompt','confirmSetStatus','deleteMemberPrompt',
+      'openAddMember','saveInlineMember','depositPrompt','editDepositPrompt','deleteTransactionPrompt','memberMenu','renamePrompt','confirmSetStatus','deleteMemberPrompt',
       'setMatchDateText','toggleLocationPicker','chooseLocation','saveLocation','openDetailedTime','toggleHourPicker','toggleMinutePicker','chooseHour','setHourChoice','chooseMinute','setMinuteChoice',
       'setField','setFieldFee','addParticipant','removeParticipant','openTeamPicker','pickMemberForTeam','addGuestPrompt','toggleGuestPaidInForm','toggleGuestPaidInResult','setTeam','setRatio','customRatioPrompt',
       'confirmLineup','backToMatchForm','setWinner','calculatePreview','confirmMatch','discardDraft','cancelMatchPrompt','setWarningThreshold','setTheme','editWarningThreshold','saveWarningThreshold'
