@@ -3421,8 +3421,8 @@ const Handlers = new Proxy({
       'openAddMember','saveInlineMember','depositPrompt','editDepositPrompt','deleteTransactionPrompt','memberMenu','renamePrompt','confirmSetStatus','deleteMemberPrompt',
       'setMatchDateText','toggleLocationPicker','chooseLocation','saveLocation','openDetailedTime','toggleHourPicker','toggleMinutePicker','chooseHour','setHourChoice','chooseMinute','setMinuteChoice',
       'setField','setFieldFee','addParticipant','removeParticipant','openTeamPicker','pickMemberForTeam','addGuestPrompt','toggleGuestPaidInForm','toggleGuestPaidInResult','setTeam','setRatio','customRatioPrompt',
-      'confirmLineup','backToMatchForm','setWinner','calculatePreview','confirmMatch','discardDraft','cancelMatchPrompt','setWarningThreshold','setTheme','editWarningThreshold','saveWarningThreshold','penaltyPrompt','confirmPenalty','savePenaltySettings','downloadBackup','manageTeamFund','saveTeamFundTransaction','teamFundTypeChanged','teamFundCategoryChanged'
-    'teamFundTransferPrompt',]);
+      'confirmLineup','backToMatchForm','setWinner','calculatePreview','confirmMatch','discardDraft','cancelMatchPrompt','setWarningThreshold','setTheme','editWarningThreshold','saveWarningThreshold','penaltyPrompt','confirmPenalty','savePenaltySettings','downloadBackup','manageTeamFund','saveTeamFundTransaction','teamFundTypeChanged','teamFundCategoryChanged','teamFundTransferPrompt',]);
+
     if (!mutating.has(prop)) return value;
     return function(...args){
       if (!Auth.requireAdmin()) return false;
