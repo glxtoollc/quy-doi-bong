@@ -2438,9 +2438,8 @@ const Handlers = new Proxy({
     const img=document.querySelector('.qr-image-wrap img');
     if(!img?.src){Snackbar.show('Không tìm thấy ảnh QR');return;}
     try{
-      // Safari/iPhone thường không xử lý ổn <a download> với data: URL.
-      // Chuyển QR thành Blob/File để dùng Web Share (Save Image) trên iOS,
-      // và dùng object URL để tải file trên desktop/Android.
+      // iPhone/iPad: <a download> hoặc tự động ghi vào Photos không được Safari
+      // cho phép. Dùng Web Share để người dùng chọn "Lưu hình ảnh".
       const response = await fetch(img.src);
       const blob = await response.blob();
       const mime = blob.type || 'image/jpeg';
@@ -2453,10 +2452,14 @@ const Handlers = new Proxy({
           title:'QR Thủ quỹ',
           text:'QR chuyển khoản quỹ đội bóng'
         });
-        Snackbar.show('Đã mở chia sẻ ảnh QR');
+        // Không được báo "đã lưu": share sheet chỉ mở ra, người dùng phải
+        // tự chọn "Lưu hình ảnh" trên iPhone/iPad.
+        Snackbar.show('Chọn "Lưu hình ảnh" để lưu QR vào Ảnh');
         return;
       }
 
+      // Desktop/Android: tải file bằng object URL.
+      // Không dùng nhánh này trên iOS nếu Web Share có hỗ trợ.
       const url = URL.createObjectURL(blob);
       const a=document.createElement('a');
       a.href=url;
@@ -2465,21 +2468,19 @@ const Handlers = new Proxy({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),1500);
-      Snackbar.show('Đã lưu ảnh QR');
+      setTimeout(()=>URL.revokeObjectURL(url),3000);
+      Snackbar.show('Đã tải ảnh QR');
     }catch(err){
-      // Fallback cho Safari không hỗ trợ download/share file: mở ảnh để người dùng
-      // có thể nhấn giữ -> Lưu vào Ảnh.
+      // Safari không hỗ trợ download/share: mở chính ảnh QR để người dùng
+      // nhấn giữ ảnh -> Lưu vào Ảnh. Không được báo đã lưu khi chưa chắc chắn.
       try{
-        const response = await fetch(img.src);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const win = window.open(url, '_blank');
-        if(!win) window.location.href = url;
-        Snackbar.show('Giữ ảnh QR để lưu vào Ảnh');
-        setTimeout(()=>URL.revokeObjectURL(url),10000);
+        const win = window.open(img.src, '_blank');
+        if(!win){
+          location.href = img.src;
+        }
+        Snackbar.show('Nhấn giữ ảnh QR → Lưu vào Ảnh');
       }catch(e){
-        Snackbar.show('Không thể lưu ảnh QR');
+        Snackbar.show('Không thể mở ảnh QR để lưu');
       }
     }
   },
