@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<!-- v1.78 -->
+<!-- v1.80 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Galaxy Football Club — Quản lý quỹ đội bóng</title>
@@ -1209,7 +1209,8 @@ const Storage = (() => {
       settings: {
         warningThreshold: 30000,
         penalties: {
-          late10: 20000,
+          lateUnder10: 20000,
+          late10to20: 30000,
           late20: 50000,
           noShowVote: 50000,
           cancelVote: 30000,
@@ -1231,7 +1232,8 @@ const Storage = (() => {
   function normalizePenaltySettings(p){
     const src = p || {};
     return {
-      late10: Number(src.late10) > 0 ? Number(src.late10) : (Number(src.late5) > 0 ? Number(src.late5) : 20000),
+      lateUnder10: Number(src.lateUnder10) > 0 ? Number(src.lateUnder10) : (Number(src.late10) > 0 ? Number(src.late10) : 20000),
+      late10to20: Number(src.late10to20) > 0 ? Number(src.late10to20) : 30000,
       late20: Number(src.late20) > 0 ? Number(src.late20) : 50000,
       noShowVote: Number(src.noShowVote) > 0 ? Number(src.noShowVote) : (Number(src.noShow) > 0 ? Number(src.noShow) : 50000),
       cancelVote: Number(src.cancelVote) > 0 ? Number(src.cancelVote) : 30000,
@@ -1380,24 +1382,28 @@ const MemberService = {
   listAll(){ return Storage.get().members; },
   get(id){ return Storage.get().members.find(m => m.id === id); },
   add(name){
+    if(!Auth.isAdmin()) return null;
     const m = { id: Utils.genId(), name: name.trim(), status: 'active', createdAt: new Date().toISOString() };
     Storage.get().members.push(m);
     Storage.save();
     return m;
   },
   rename(id, newName){
-    const m = this.get(id); if(!m) return;
+    if(!Auth.isAdmin()) return false;
+    const m = this.get(id); if(!m) return false;
     m.name = newName.trim();
     Storage.save();
   },
   setStatus(id, status){
-    const m = this.get(id); if(!m) return;
+    if(!Auth.isAdmin()) return false;
+    const m = this.get(id); if(!m) return false;
     m.status = status;
     Storage.save();
   },
   /** Chỉ xóa cứng khi thành viên CHƯA có giao dịch nào (chưa từng nạp tiền / tham gia trận nào đã tính tiền).
    * Nếu đã có giao dịch, trả về ok:false — nên dùng "Cho nghỉ đội" (setStatus) để giữ lịch sử. */
   remove(id){
+    if(!Auth.isAdmin()) return { ok:false, reason:'Chỉ quản trị viên mới được xóa thành viên.' };
     const balance = TransactionService.balanceOf(id);
     if(balance !== 0) return { ok:false, reason:'Chỉ được xóa thành viên khi số dư quỹ đúng bằng 0 VNĐ.' };
     const state = Storage.get();
@@ -1419,7 +1425,10 @@ const TransactionService = {
       .filter(t => t.memberId === memberId)
       .reduce((sum, t) => sum + t.amount, 0);
   },
-  _push(t){ Storage.get().transactions.push(t); Storage.save(); return t; },
+  _push(t){
+    if(!Auth.isAdmin()) return null;
+    Storage.get().transactions.push(t); Storage.save(); return t;
+  },
   addDeposit(memberId, amount){
     return this._push({ id: Utils.genId(), memberId, type: TransactionType.DEPOSIT, amount: Math.abs(amount), matchId: null, note: 'Đóng quỹ', createdAt: new Date().toISOString() });
   },
@@ -1442,6 +1451,7 @@ const TransactionService = {
   },
   getById(txId){ return Storage.get().transactions.find(t => t.id === txId); },
   delete(txId){
+    if(!Auth.isAdmin()) return false;
     const state = Storage.get();
     const index = state.transactions.findIndex(t => t.id === txId);
     if(index < 0) return false;
@@ -1452,6 +1462,7 @@ const TransactionService = {
   /** Sửa số tiền một giao dịch NẠP TIỀN đã tạo trước đó — không sửa đè bản ghi cũ,
    * mà tạo thêm 1 giao dịch điều chỉnh (chênh lệch) để giữ nguyên lịch sử. */
   correctDeposit(txId, newAmount){
+    if(!Auth.isAdmin()) return null;
     const tx = this.getById(txId); if(!tx || tx.type !== TransactionType.DEPOSIT) return null;
     const delta = newAmount - tx.amount;
     if(delta === 0) return null;
@@ -1459,6 +1470,7 @@ const TransactionService = {
   },
   /** Hủy hẳn một giao dịch nạp tiền bị nhầm — hoàn lại đúng số tiền, giữ nguyên bản ghi gốc. */
   cancelDeposit(txId){
+    if(!Auth.isAdmin()) return null;
     const tx = this.getById(txId); if(!tx || tx.type !== TransactionType.DEPOSIT) return null;
     return this.addAdjustment(tx.memberId, -tx.amount, `Hủy giao dịch nạp nhầm ${Utils.formatCurrency(tx.amount)}`);
   },
@@ -1485,6 +1497,7 @@ const MatchService = {
   get(id){ return Storage.get().matches.find(m => m.id === id); },
 
   createDraft(data){
+    if(!Auth.isAdmin()) return null;
     const match = {
       id: Utils.genId(),
       date: data.date, time: data.time, location: data.location || '', fieldFee: data.fieldFee || 0,
@@ -1501,6 +1514,7 @@ const MatchService = {
   },
 
   update(id, patch){
+    if(!Auth.isAdmin()) return false;
     const match = this.get(id); if(!match) return;
     Object.assign(match, patch, { updatedAt: new Date().toISOString() });
     Storage.save();
@@ -1508,6 +1522,7 @@ const MatchService = {
   },
 
   addParticipant(matchId, refType, refId){
+    if(!Auth.isAdmin()) return false;
     const match = this.get(matchId); if(!match) return;
     match.participants = match.participants.filter(p => !(p.refType===refType && p.refId===refId));
     match.participants.push({ refType, refId, team: 'team2' });
@@ -1516,6 +1531,7 @@ const MatchService = {
   },
 
   removeParticipant(matchId, refType, refId){
+    if(!Auth.isAdmin()) return false;
     const match = this.get(matchId); if(!match) return;
     match.participants = match.participants.filter(p => !(p.refType===refType && p.refId===refId));
     if(refType === 'guest'){ match.guests = match.guests.filter(g => g.id !== refId); }
@@ -2333,7 +2349,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.78</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.80</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2407,24 +2423,16 @@ Views.renderSettings = () => {
         <details class="gfc-violation-settings">
           <summary><span><strong>Mức phạt vi phạm</strong><small>Thiết lập từng mức phạt cho thành viên</small></span><span class="violation-chevron">⌄</span></summary>
           <div class="violation-settings-body">
-            <div class="hint" style="margin-bottom:12px;">Chỉ quản trị viên được thay đổi. Mức phạt mới chỉ áp dụng cho các lần phạt sau đó.</div>
+            <div class="hint" style="margin-bottom:12px;">Chỉ quản trị viên được thay đổi. Thành viên thường chỉ được xem.</div>
             <div class="settings-inline" style="margin-bottom:10px;">
-              <div class="settings-copy"><div class="settings-label">Đi muộn từ 10–20 phút</div></div>
-              <div class="settings-value"><input id="penalty-late10-input" type="number" min="1" inputmode="numeric" value="${Math.max(1,Math.round((Number(settings.penalties?.late10)||20000)/1000))}"><span>nghìn</span></div>
+              <div class="settings-copy"><div class="settings-label">Đi muộn dưới 10 phút</div></div>
+              <div class="settings-value"><input id="penalty-late-under10-input" type="number" min="1" inputmode="numeric" value="${Math.max(1,Math.round((Number(settings.penalties?.lateUnder10)||20000)/1000))}" ${Auth.isAdmin()?'':'disabled'}><span>nghìn</span></div>
+<div class="settings-value"><input id="penalty-late10to20-input" type="number" min="1" inputmode="numeric" value="${Math.max(1,Math.round((Number(settings.penalties?.late10to20)||30000)/1000))}" ${Auth.isAdmin()?'':'disabled'}><span>nghìn</span></div>
+<div class="settings-value"><input id="penalty-cancel-vote-input" type="number" min="1" inputmode="numeric" value="${Math.max(1,Math.round((Number(settings.penalties?.cancelVote)||30000)/1000))}" ${Auth.isAdmin()?'':'disabled'}><span>nghìn</span></div>
+<div class="settings-value"><input id="penalty-late20-input" type="number" min="1" inputmode="numeric" value="${Math.max(1,Math.round((Number(settings.penalties?.late20)||50000)/1000))}" ${Auth.isAdmin()?'':'disabled'}><span>nghìn</span></div>
+<div class="settings-value"><input id="penalty-no-show-vote-input" type="number" min="1" inputmode="numeric" value="${Math.max(1,Math.round((Number(settings.penalties?.noShowVote)||50000)/1000))}" ${Auth.isAdmin()?'':'disabled'}><span>nghìn</span></div>
             </div>
-            <div class="settings-inline" style="margin-bottom:10px;">
-              <div class="settings-copy"><div class="settings-label">Đi muộn trên 20 phút</div></div>
-              <div class="settings-value"><input id="penalty-late20-input" type="number" min="1" inputmode="numeric" value="${Math.max(1,Math.round((Number(settings.penalties?.late20)||50000)/1000))}"><span>nghìn</span></div>
-            </div>
-            <div class="settings-inline" style="margin-bottom:10px;">
-              <div class="settings-copy"><div class="settings-label">Vote nhưng không đi</div></div>
-              <div class="settings-value"><input id="penalty-no-show-vote-input" type="number" min="1" inputmode="numeric" value="${Math.max(1,Math.round((Number(settings.penalties?.noShowVote)||50000)/1000))}"><span>nghìn</span></div>
-            </div>
-            <div class="settings-inline">
-              <div class="settings-copy"><div class="settings-label">Bỏ vote sau khi đặt sân</div></div>
-              <div class="settings-value"><input id="penalty-cancel-vote-input" type="number" min="1" inputmode="numeric" value="${Math.max(1,Math.round((Number(settings.penalties?.cancelVote)||30000)/1000))}"><span>nghìn</span></div>
-            </div>
-            ${Auth.isAdmin() ? `<button class="btn btn-primary settings-save-btn" onclick="Handlers.savePenaltySettings()">Lưu mức phạt</button>` : `<div class="hint" style="margin-top:12px;">Đăng nhập quản trị để chỉnh sửa mức phạt.</div>`}
+            ${Auth.isAdmin() ? `<button class="btn btn-primary settings-save-btn" onclick="Handlers.savePenaltySettings()">Lưu mức phạt</button>` : `<div class="hint" style="margin-top:12px;">Chỉ quản trị viên mới có thể thiết lập mức phạt.</div>`}
           </div>
         </details>
       </div>
@@ -2439,7 +2447,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.78</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.80</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -2516,7 +2524,7 @@ const Handlers = new Proxy({
     if(!Auth.isAdmin()) return false;
     const payload = {
       exportedAt: new Date().toISOString(),
-      appVersion: 'v1.78',
+      appVersion: 'v1.80',
       data: JSON.parse(JSON.stringify(Storage.get()))
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -2641,10 +2649,11 @@ const Handlers = new Proxy({
     if(!member) return;
     const penalties = Storage.get().settings.penalties || {};
     const options = [
-      {key:'late10', label:'Đi muộn từ 10–20 phút', amount:Number(penalties.late10)||20000},
+      {key:'lateUnder10', label:'Đi muộn dưới 10 phút', amount:Number(penalties.lateUnder10)||20000},
+      {key:'late10to20', label:'Đi muộn từ 10–20 phút', amount:Number(penalties.late10to20)||30000},
+      {key:'cancelVote', label:'Bỏ vote sau khi đặt sân', amount:Number(penalties.cancelVote)||30000},
       {key:'late20', label:'Đi muộn trên 20 phút', amount:Number(penalties.late20)||50000},
       {key:'noShowVote', label:'Vote nhưng không đi', amount:Number(penalties.noShowVote)||50000},
-      {key:'cancelVote', label:'Bỏ vote sau khi đặt sân', amount:Number(penalties.cancelVote)||30000},
     ];
     Dialogs.openSheet(`
       <h3>Trừ tiền lỗi — ${Utils.escapeHtml(member.name)}</h3>
@@ -2657,10 +2666,11 @@ const Handlers = new Proxy({
     const member = MemberService.get(memberId);
     const penalties = Storage.get().settings.penalties || {};
     const meta = {
-      late10:{label:'Đi muộn từ 10–20 phút', amount:Number(penalties.late10)||20000},
+      lateUnder10:{label:'Đi muộn dưới 10 phút', amount:Number(penalties.lateUnder10)||20000},
+      late10to20:{label:'Đi muộn từ 10–20 phút', amount:Number(penalties.late10to20)||30000},
+      cancelVote:{label:'Bỏ vote sau khi đặt sân', amount:Number(penalties.cancelVote)||30000},
       late20:{label:'Đi muộn trên 20 phút', amount:Number(penalties.late20)||50000},
       noShowVote:{label:'Vote nhưng không đi', amount:Number(penalties.noShowVote)||50000},
-      cancelVote:{label:'Bỏ vote sau khi đặt sân', amount:Number(penalties.cancelVote)||30000},
     }[penaltyKey];
     if(!member || !meta || meta.amount <= 0){ Dialogs.alert('Mức phạt không hợp lệ.'); return; }
     Dialogs.confirm(`Trừ ${Utils.formatCurrency(meta.amount)} của ${Utils.escapeHtml(member.name)} vì “${Utils.escapeHtml(meta.label)}”?\n\nGiao dịch sẽ được ghi vào lịch sử.`, () => {
@@ -2672,10 +2682,10 @@ const Handlers = new Proxy({
   },
   savePenaltySettings(){
     if(!Auth.isAdmin()) return false;
-    const ids = ['penalty-late10-input','penalty-late20-input','penalty-no-show-vote-input','penalty-cancel-vote-input'];
+    const ids = ['penalty-late-under10-input','penalty-late10to20-input','penalty-late20-input','penalty-no-show-vote-input','penalty-cancel-vote-input'];
     const values = ids.map(id => parseInt(document.getElementById(id)?.value,10));
     if(values.some(v => !Number.isFinite(v) || v <= 0)){ Snackbar.show('Tất cả mức phạt phải lớn hơn 0'); return false; }
-    Storage.get().settings.penalties = {late10:values[0]*1000,late20:values[1]*1000,noShowVote:values[2]*1000,cancelVote:values[3]*1000};
+    Storage.get().settings.penalties = {lateUnder10:values[0]*1000,late10to20:values[1]*1000,late20:values[2]*1000,noShowVote:values[3]*1000,cancelVote:values[4]*1000};
     Storage.save();
     Snackbar.show('Đã lưu mức phạt vi phạm');
     Views.renderSettings();
@@ -3113,6 +3123,7 @@ const Handlers = new Proxy({
   },
 
   setWarningThreshold(value){
+    if(!Auth.isAdmin()) return false;
     const v = parseInt(value, 10);
     if(isNaN(v) || v <= 0){ Snackbar.show('Giá trị không hợp lệ'); return false; }
     Storage.get().settings.warningThreshold = v * 1000;
@@ -3120,6 +3131,7 @@ const Handlers = new Proxy({
     return true;
   },
   setTheme(themeId){
+    if(!Auth.isAdmin()) return false;
     const allowed = ['pitch','night','stadium','sunset','classic','neon'];
     if(!allowed.includes(themeId)) return;
     Storage.get().settings.theme = themeId;
@@ -3152,7 +3164,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.78</strong>
+          <strong>v1.80</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
