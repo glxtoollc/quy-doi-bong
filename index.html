@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<!-- v1.71 -->
+<!-- v1.72 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Galaxy Football Club — Quản lý quỹ đội bóng</title>
@@ -2261,7 +2261,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.71</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.72</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2340,7 +2340,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.71</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.72</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -2417,7 +2417,7 @@ const Handlers = new Proxy({
     if(!Auth.isAdmin()) return false;
     const payload = {
       exportedAt: new Date().toISOString(),
-      appVersion: 'v1.71',
+      appVersion: 'v1.72',
       data: JSON.parse(JSON.stringify(Storage.get()))
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -2430,20 +2430,58 @@ const Handlers = new Proxy({
   },
   refreshApp(){
     const hash = location.hash || '';
-    const url = `${location.pathname}?app=1.69&r=${Date.now()}${hash}`;
+    const url = `${location.pathname}?app=1.72&r=${Date.now()}${hash}`;
     Snackbar.show('Đang tải phiên bản mới...');
     setTimeout(() => { window.location.replace(url); }, 120);
   },
-  downloadQr(){
+  async downloadQr(){
     const img=document.querySelector('.qr-image-wrap img');
     if(!img?.src){Snackbar.show('Không tìm thấy ảnh QR');return;}
-    const a=document.createElement('a');
-    a.href=img.src;
-    a.download='QR-Thu-Quy-TPBank.jpg';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    Snackbar.show('Đã lưu ảnh QR');
+    try{
+      // Safari/iPhone thường không xử lý ổn <a download> với data: URL.
+      // Chuyển QR thành Blob/File để dùng Web Share (Save Image) trên iOS,
+      // và dùng object URL để tải file trên desktop/Android.
+      const response = await fetch(img.src);
+      const blob = await response.blob();
+      const mime = blob.type || 'image/jpeg';
+      const ext = mime.includes('png') ? 'png' : 'jpg';
+      const file = new File([blob], `QR-Thu-Quy-TPBank.${ext}`, {type:mime});
+
+      if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
+        await navigator.share({
+          files:[file],
+          title:'QR Thủ quỹ',
+          text:'QR chuyển khoản quỹ đội bóng'
+        });
+        Snackbar.show('Đã mở chia sẻ ảnh QR');
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download=file.name;
+      a.rel='noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1500);
+      Snackbar.show('Đã lưu ảnh QR');
+    }catch(err){
+      // Fallback cho Safari không hỗ trợ download/share file: mở ảnh để người dùng
+      // có thể nhấn giữ -> Lưu vào Ảnh.
+      try{
+        const response = await fetch(img.src);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const win = window.open(url, '_blank');
+        if(!win) window.location.href = url;
+        Snackbar.show('Giữ ảnh QR để lưu vào Ảnh');
+        setTimeout(()=>URL.revokeObjectURL(url),10000);
+      }catch(e){
+        Snackbar.show('Không thể lưu ảnh QR');
+      }
+    }
   },
   setHomePage(page){homePage=Math.max(1,Number(page)||1);Views.renderHome();},
   setTxMonth(value){txFilterMonth=value;Views.renderTransactions();},
@@ -2931,7 +2969,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.71</strong>
+          <strong>v1.72</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
@@ -2975,8 +3013,17 @@ window.addEventListener('firebase-sync-status', () => {
 });
 
 /* ---------------------------- ROUTER ---------------------------- */
+Views.cleanupTransientUI = () => {
+  // Remove any transient member UI that may have escaped #app due to fixed positioning.
+  document.querySelectorAll('.member-add-luxury, .member-add-dock').forEach(el => {
+    if (!document.getElementById('app')?.contains(el)) el.remove();
+  });
+  membersAddOpen = false;
+};
+
 const Router = {
   route(){
+    Views.cleanupTransientUI();
     const hash = (location.hash || '#/home').slice(1);
     const parts = hash.split('/').filter(Boolean);
 
@@ -3018,6 +3065,78 @@ const Router = {
   Object.assign(window, { Handlers, Dialogs, Views, Router, Storage, MemberService, TransactionService, MatchService });
 
   window.addEventListener('hashchange', () => { window.scrollTo(0,0); Router.route(); });
+
+// iPhone/Safari pull-to-refresh for the Home Screen web app.
+// Only activates at the very top of the page and when the gesture is clearly downward.
+(() => {
+  let startY = 0;
+  let pulling = false;
+  let indicator = null;
+
+  const ensureIndicator = () => {
+    if (indicator) return indicator;
+    indicator = document.createElement('div');
+    indicator.id = 'app-pull-refresh-indicator';
+    indicator.textContent = '↓ Kéo xuống để cập nhật';
+    Object.assign(indicator.style, {
+      position:'fixed', top:'calc(env(safe-area-inset-top,0px) + 6px)', left:'50%',
+      transform:'translate(-50%,-130%)', zIndex:'10000', padding:'7px 13px',
+      borderRadius:'999px', background:'#17324D', color:'#fff', fontSize:'12px',
+      fontWeight:'800', boxShadow:'0 4px 16px rgba(0,0,0,.18)',
+      transition:'transform .18s ease, opacity .18s ease', opacity:'0',
+      pointerEvents:'none'
+    });
+    document.body.appendChild(indicator);
+    return indicator;
+  };
+
+  window.addEventListener('touchstart', e => {
+    if (window.scrollY > 0 || e.touches.length !== 1) {
+      pulling = false;
+      return;
+    }
+    startY = e.touches[0].clientY;
+    pulling = true;
+  }, {passive:true});
+
+  window.addEventListener('touchmove', e => {
+    if (!pulling || window.scrollY > 0 || e.touches.length !== 1) return;
+    const distance = e.touches[0].clientY - startY;
+    if (distance <= 0) return;
+    const el = ensureIndicator();
+    const progress = Math.min(distance / 80, 1);
+    el.style.transform = `translate(-50%, ${-130 + progress * 130}%)`;
+    el.style.opacity = String(Math.min(progress * 1.2, 1));
+  }, {passive:true});
+
+  window.addEventListener('touchend', () => {
+    if (!pulling) return;
+    pulling = false;
+    const el = ensureIndicator();
+    const shouldRefresh = el.style.opacity && parseFloat(el.style.opacity) >= 0.9;
+    if (shouldRefresh) {
+      el.textContent = '↻ Đang cập nhật...';
+      el.style.transform = 'translate(-50%, 0)';
+      setTimeout(() => {
+        const url = new URL(window.location.href);
+        url.searchParams.set('refresh', Date.now());
+        window.location.replace(url.toString());
+      }, 180);
+    } else {
+      el.style.transform = 'translate(-50%,-130%)';
+      el.style.opacity = '0';
+    }
+  }, {passive:true});
+
+  window.addEventListener('touchcancel', () => {
+    pulling = false;
+    if (indicator) {
+      indicator.style.transform = 'translate(-50%,-130%)';
+      indicator.style.opacity = '0';
+    }
+  }, {passive:true});
+})();
+
 window.addEventListener('DOMContentLoaded', async () => {
   applyTheme((Storage.get().settings || {}).theme || 'pitch');
   const loaded = await Storage.loadFromFirebase();
