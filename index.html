@@ -1033,13 +1033,19 @@ select option{background:#0A2E55;color:#fff;}
 .team-fund-sheet .tf-row .plus{color:#16803A;font-weight:800;}.team-fund-sheet .tf-row .minus{color:#C62828;font-weight:800;}
 
 #demo-mode-banner{
-  display:none; position:fixed; z-index:99999; top:10px; left:50%; transform:translateX(-50%);
-  max-width:calc(100% - 24px); padding:7px 12px; border-radius:999px;
+  display:none; position:fixed; z-index:100000; top:calc(env(safe-area-inset-top,0px) + 10px); left:50%; transform:translateX(-50%);
+  width:max-content; max-width:calc(100% - 24px); padding:7px 12px; border-radius:999px;
   background:#5b4300; color:#ffe7a3; border:1px solid #f6c453;
-  font:600 12px/1.3 system-ui,-apple-system,Segoe UI,sans-serif; text-align:center;
-  box-shadow:0 8px 24px rgba(0,0,0,.28); pointer-events:none;
+  font:700 12px/1.3 system-ui,-apple-system,Segoe UI,sans-serif; text-align:center;
+  box-shadow:0 8px 24px rgba(0,0,0,.35); pointer-events:none; white-space:nowrap;
 }
 body.demo-mode #demo-mode-banner{display:block;}
+.demo-settings-row .settings-copy{min-width:0;flex:1;}
+.demo-settings-row > .btn{width:auto!important;min-width:116px;flex:0 0 auto;white-space:nowrap;}
+@media(max-width:520px){
+  .demo-settings-row{flex-direction:column;align-items:stretch!important;gap:10px!important;}
+  .demo-settings-row > .btn{width:100%!important;min-width:0;}
+}
 
 
 .result-final-card{border:1px solid rgba(246,196,83,.35);background:linear-gradient(180deg,rgba(246,196,83,.08),rgba(255,255,255,.02));}
@@ -1151,7 +1157,12 @@ body.demo-mode #demo-mode-banner{display:block;}
     }
     function save(state){
       if(!enabled) return false;
-      demoState = clone(state) || demoState;
+      // Storage.save() normally passes the active demoState itself. Keep the
+      // same object reference so code that continues mutating a match/member
+      // after a save does not accidentally mutate a stale object.
+      if(state !== demoState){
+        demoState = clone(state) || demoState;
+      }
       persist();
       return true;
     }
@@ -1767,14 +1778,20 @@ const TransactionService = {
     return this._push({ id: Utils.genId(), memberId, type: TransactionType.REVERSAL, amount: -originalAmount, matchId, note: 'Hoàn tiền', createdAt: new Date().toISOString() });
   },
   reverseMatch(matchId){
-    // Chỉ hoàn tác những match_cost CHƯA từng được hoàn tác trước đó,
-    // tránh trường hợp sửa trận nhiều lần rồi hủy gây hoàn tiền trùng lặp (double-reversal).
-    const related = Storage.get().transactions.filter(t => t.matchId === matchId && t.type === TransactionType.MATCH_COST && !t.reversed);
+    // Atomic reversal: build all reversal transactions in the current state,
+    // then save once. This is important for Demo Mode because its persistence
+    // layer must not invalidate object references mid-operation.
+    const state = Storage.get();
+    const related = state.transactions.filter(t => t.matchId === matchId && t.type === TransactionType.MATCH_COST && !t.reversed);
+    const now = new Date().toISOString();
     related.forEach(t => {
-      this.addReversal(t.memberId, t.amount, matchId);
+      state.transactions.push({
+        id: Utils.genId(), memberId: t.memberId, type: TransactionType.REVERSAL,
+        amount: -t.amount, matchId, note: 'Hoàn tiền', createdAt: now
+      });
       t.reversed = true;
     });
-    Storage.save();
+    return Storage.save();
   },
 };
 
@@ -1912,10 +1929,14 @@ const MatchService = {
       }
     });
 
-    match.perPersonAmounts = perPersonAmounts;
-    match.status = MatchStatus.COMPLETED;
-    match.updatedAt = new Date().toISOString();
-    Storage.save();
+    // Some persistence backends may replace the active state object on save.
+    // Always reacquire the match before writing its final status.
+    const savedMatch = this.get(matchId);
+    if(!savedMatch) return { ok:false, errors:['Không thể cập nhật trạng thái trận đấu sau khi lưu giao dịch'] };
+    savedMatch.perPersonAmounts = perPersonAmounts;
+    savedMatch.status = MatchStatus.COMPLETED;
+    savedMatch.updatedAt = new Date().toISOString();
+    if(!Storage.save()) return { ok:false, errors:['Không thể lưu trạng thái trận đấu'] };
     return { ok:true };
   },
 
@@ -2655,7 +2676,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.84</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.85</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2700,7 +2721,7 @@ Views.renderSettings = () => {
       ${Auth.isAdmin() ? `
       <div class="section-title">Kiểm thử</div>
       <div class="card settings-compact-card" style="border:1px solid ${DemoMode.isEnabled()?'#F6C453':'rgba(255,255,255,.08)'};">
-        <div class="settings-inline">
+        <div class="settings-inline demo-settings-row">
           <div class="settings-copy">
             <div class="settings-label">🧪 Chế độ Demo</div>
             <div class="hint">${DemoMode.isEnabled()
@@ -2769,7 +2790,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.84</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.85</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -3498,6 +3519,11 @@ const Handlers = new Proxy({
   confirmMatch(matchId){
     const res = MatchService.confirm(matchId);
     if(!res.ok){ Dialogs.alert(res.errors.join('\n')); return; }
+    const savedMatch = MatchService.get(matchId);
+    if(!savedMatch || savedMatch.status !== MatchStatus.COMPLETED){
+      Dialogs.alert('Chưa xác nhận được trạng thái lưu trận. Dữ liệu chưa được chuyển sang kết quả.');
+      return;
+    }
     lastPreview = null;
     DraftService.clear(matchId);
     Snackbar.show('Đã lưu trận đấu');
@@ -3564,7 +3590,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.84</strong>
+          <strong>v1.85</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
