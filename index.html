@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<!-- v1.82 -->
+<!-- v1.84 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Galaxy Football Club — Quản lý quỹ đội bóng</title>
@@ -1031,6 +1031,22 @@ select option{background:#0A2E55;color:#fff;}
 .team-fund-sheet .tf-row{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid #eee;font-size:13px;}
 .team-fund-sheet .tf-row:last-child{border-bottom:0;}
 .team-fund-sheet .tf-row .plus{color:#16803A;font-weight:800;}.team-fund-sheet .tf-row .minus{color:#C62828;font-weight:800;}
+
+#demo-mode-banner{
+  display:none; position:fixed; z-index:99999; top:10px; left:50%; transform:translateX(-50%);
+  max-width:calc(100% - 24px); padding:7px 12px; border-radius:999px;
+  background:#5b4300; color:#ffe7a3; border:1px solid #f6c453;
+  font:600 12px/1.3 system-ui,-apple-system,Segoe UI,sans-serif; text-align:center;
+  box-shadow:0 8px 24px rgba(0,0,0,.28); pointer-events:none;
+}
+body.demo-mode #demo-mode-banner{display:block;}
+
+
+.result-final-card{border:1px solid rgba(246,196,83,.35);background:linear-gradient(180deg,rgba(246,196,83,.08),rgba(255,255,255,.02));}
+.result-final-success{display:flex;align-items:center;gap:12px;padding:2px 0 16px;margin-bottom:14px;border-bottom:1px solid rgba(255,255,255,.08);}
+.result-final-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#2e9d68;color:#fff;font-size:20px;font-weight:900;flex:none;}
+.result-final-title{font-size:18px;font-weight:800;color:#fff;}
+.result-final-actions{display:grid;gap:9px;margin-top:14px;}
 </style>
 </head>
 <body>
@@ -1038,6 +1054,7 @@ select option{background:#0A2E55;color:#fff;}
 <div id="app"></div>
 <div id="bottom-tabbar"></div>
 <div id="snackbar"></div>
+<div id="demo-mode-banner" aria-live="polite"></div>
 
 <div class="qr-preview-overlay" id="qr-preview-overlay" onclick="if(event.target===this) Handlers.closeQrPreview()">
   <div class="qr-preview-box">
@@ -1068,6 +1085,89 @@ select option{background:#0A2E55;color:#fff;}
   const auth = getAuth(firebaseApp);
   window.FirebaseAuth = auth;
 
+  /* ---------------------------- DEMO MODE v1.83 ---------------------------- */
+  // Demo is a sandbox. Real state is never mutated, merged, or synced while demo is active.
+  const DemoMode = (() => {
+    const FLAG_KEY = 'quy-doi-bong-demo-mode-v1';
+    const STATE_KEY = 'quy-doi-bong-demo-state-v1';
+    let enabled = false;
+    let demoState = null;
+
+    function clone(obj){
+      try { return JSON.parse(JSON.stringify(obj)); }
+      catch(e) { return null; }
+    }
+    function makeDemoState(real){
+      const s = clone(real) || {};
+      s.members = Array.isArray(s.members) ? s.members.map(m => ({...m})) : [];
+      // Money/history are intentionally isolated and reset.
+      s.transactions = [];
+      s.matches = [];
+      s.teamFund = { transactions: [], balance: 0, migratedPenaltyIds: [] };
+      return s;
+    }
+    function loadPersisted(){
+      try { enabled = localStorage.getItem(FLAG_KEY) === '1'; } catch(e) { enabled = false; }
+      if(enabled){
+        try {
+          const raw = JSON.parse(localStorage.getItem(STATE_KEY)||'null');
+          if(raw && typeof raw === 'object' && Array.isArray(raw.members)){
+            demoState = raw;
+          } else {
+            enabled = false;
+          }
+        } catch(e) { enabled = false; demoState = null; }
+      }
+    }
+    function persist(){
+      try {
+        if(enabled){
+          localStorage.setItem(FLAG_KEY,'1');
+          localStorage.setItem(STATE_KEY, JSON.stringify(demoState));
+        } else {
+          localStorage.removeItem(FLAG_KEY);
+          localStorage.removeItem(STATE_KEY);
+        }
+      } catch(e) {}
+    }
+    function isEnabled(){ return enabled; }
+    function getState(){ return enabled ? demoState : null; }
+    function start(realState){
+      if(!Auth.isAdmin()) return false;
+      if(enabled) return true;
+      demoState = makeDemoState(realState);
+      enabled = true;
+      persist();
+      document.body?.classList.add('demo-mode');
+      return true;
+    }
+    function stop(){
+      if(!Auth.isAdmin()) return false;
+      enabled = false;
+      demoState = null;
+      persist();
+      document.body?.classList.remove('demo-mode');
+      return true;
+    }
+    function save(state){
+      if(!enabled) return false;
+      demoState = clone(state) || demoState;
+      persist();
+      return true;
+    }
+    loadPersisted();
+    window.DemoMode = { isEnabled, getState, start, stop, save };
+    document.body?.classList.toggle('demo-mode', enabled);
+    return window.DemoMode;
+  })();
+
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const b=document.getElementById('demo-mode-banner');
+    if(b) b.textContent='🧪 DEMO — Giao dịch không ảnh hưởng dữ liệu thật';
+    document.body.classList.toggle('demo-mode', !!window.DemoMode?.isEnabled());
+  });
+
   window.FirebaseSync = {
     db,
     docRef: doc(db, 'appData', 'football_team_fund_v1'),
@@ -1079,6 +1179,7 @@ select option{background:#0A2E55;color:#fff;}
       window.dispatchEvent(new CustomEvent('firebase-sync-status', { detail:{ status:this.status, message:this.statusMessage } }));
     },
     async load(){
+      if(window.DemoMode?.isEnabled()) return null;
       this.setStatus('saving','Đang tải dữ liệu Firebase...');
       try {
         const snap = await getDoc(this.docRef);
@@ -1090,6 +1191,7 @@ select option{background:#0A2E55;color:#fff;}
       }
     },
     async save(state){
+      if(window.DemoMode?.isEnabled()) return false;
       const payload = { ...state, updatedAt: new Date().toISOString() };
       try { localStorage.setItem(this.queueKey, JSON.stringify(payload)); } catch(e) {}
       if(navigator.onLine === false){
@@ -1108,6 +1210,7 @@ select option{background:#0A2E55;color:#fff;}
       }
     },
     async flushPending(){
+      if(window.DemoMode?.isEnabled()) return false;
       if(navigator.onLine === false) return false;
       let pending=null;
       try { pending=JSON.parse(localStorage.getItem(this.queueKey)||'null'); } catch(e) {}
@@ -1124,7 +1227,10 @@ select option{background:#0A2E55;color:#fff;}
       }
     }
   };
-  window.addEventListener('online', () => { window.FirebaseSync.flushPending().then(()=>{ try { Router.route(); } catch(e) {} }); });
+  window.addEventListener('online', () => {
+    if(window.DemoMode?.isEnabled()) return;
+    window.FirebaseSync.flushPending().then(()=>{ try { Router.route(); } catch(e) {} });
+  });
   window.addEventListener('offline', () => window.FirebaseSync.setStatus('saving','Mất mạng — đang lưu tạm trên máy'));
 
   'use strict';
@@ -1238,6 +1344,10 @@ const Storage = (() => {
 
   let state = defaultState();
 
+  function activeState(){
+    return window.DemoMode?.isEnabled() ? window.DemoMode.getState() : state;
+  }
+
   function normalizeTeamFund(tf, transactions){
     const src=tf && typeof tf==='object' ? tf : {};
     const ledger=Array.isArray(src.transactions) ? src.transactions.map(t=>({
@@ -1275,9 +1385,12 @@ const Storage = (() => {
   }
 
   return {
-    get(){ return state; },
+    get(){ return activeState(); },
     save(){
       if(!Auth.isAdmin()) return false;
+      if(window.DemoMode?.isEnabled()){
+        return window.DemoMode.save(activeState());
+      }
       try { localStorage.setItem('quy-doi-bong-local-cache-v1', JSON.stringify(state)); } catch(e) {}
       if(window.FirebaseSync){
         window.FirebaseSync.save(state).catch(err => console.error('Firebase save error:', err));
@@ -1285,6 +1398,7 @@ const Storage = (() => {
       return true;
     },
     async loadFromFirebase(){
+      if(window.DemoMode?.isEnabled()) return true;
       if(!window.FirebaseSync) return false;
       try{
         const remote = await window.FirebaseSync.load();
@@ -1340,7 +1454,13 @@ const Storage = (() => {
       state = defaultState();
       return false;
     },
-    replace(newState){ state = newState; this.save(); },
+    replace(newState){
+      if(window.DemoMode?.isEnabled()){
+        return window.DemoMode.save(newState);
+      }
+      state = newState;
+      this.save();
+    },
     isValidImport(obj){
       return obj && typeof obj === 'object'
         && Array.isArray(obj.members) && Array.isArray(obj.transactions) && Array.isArray(obj.matches);
@@ -2471,7 +2591,14 @@ Views.renderMatchResult = (matchId) => {
         <div class="loc">Tỷ lệ ${match.ratio.losingShare}/${match.ratio.winningShare} (đội thua/đội thắng)</div>
       </div>
 
-      <div class="card">
+      <div class="card result-final-card">
+        <div class="result-final-success">
+          <div class="result-final-icon">✓</div>
+          <div>
+            <div class="result-final-title">Trận đấu đã được lưu</div>
+            <div class="hint" style="margin-top:3px;">Kết quả và các khoản tiền đã được ghi nhận.</div>
+          </div>
+        </div>
         <div class="result-calc-grid">
           <div class="result-calc-team team-result-winner">
             <h3 class="winner">Đội ${winningTeam==='team1'?'1':'2'} thắng</h3>
@@ -2487,9 +2614,10 @@ Views.renderMatchResult = (matchId) => {
         <div class="total-line"><span>Tổng đóng quỹ</span><span>${Utils.formatCurrency(total)}</span></div>
       </div>
 
-      <div class="btn-row">
-        <button class="btn btn-outline" onclick="location.hash='#/match/${matchId}/edit'">Sửa trận</button>
-        <button class="btn btn-danger-outline" onclick="Handlers.cancelMatchPrompt('${matchId}')">Hủy trận</button>
+      <div class="result-final-actions">
+        <button class="btn btn-primary btn-block" onclick="location.hash='#/home'">⌂ &nbsp; Về trang chủ</button>
+        <button class="btn btn-outline btn-block" onclick="location.hash='#/match/${matchId}/edit'">✎ &nbsp; Quay lại chỉnh sửa trận</button>
+        <button class="btn btn-danger-outline btn-block" onclick="Handlers.cancelMatchPrompt('${matchId}')">Hủy trận đấu</button>
       </div>
     </div>
   `;
@@ -2527,7 +2655,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.82</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.84</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2568,6 +2696,22 @@ Views.renderSettings = () => {
       </div>
       ${Auth.isAdmin() ? `<button class="btn btn-outline gfc-backup-btn" onclick="Handlers.downloadBackup()">⇩ &nbsp; Sao lưu dữ liệu</button>` : ''}
       <button class="btn btn-outline gfc-backup-btn" onclick="Handlers.refreshApp()">↻ &nbsp; Cập nhật ứng dụng</button>
+
+      ${Auth.isAdmin() ? `
+      <div class="section-title">Kiểm thử</div>
+      <div class="card settings-compact-card" style="border:1px solid ${DemoMode.isEnabled()?'#F6C453':'rgba(255,255,255,.08)'};">
+        <div class="settings-inline">
+          <div class="settings-copy">
+            <div class="settings-label">🧪 Chế độ Demo</div>
+            <div class="hint">${DemoMode.isEnabled()
+              ? '<strong style="color:#F6C453;">ĐANG BẬT</strong> — giao dịch và số dư chỉ nằm trong dữ liệu Demo, không ảnh hưởng dữ liệu thật.'
+              : 'Tạo một môi trường tiền riêng để test. Dữ liệu thật được giữ nguyên.'}</div>
+          </div>
+          ${DemoMode.isEnabled()
+            ? `<button class="btn btn-outline" onclick="Handlers.stopDemoMode()">Thoát Demo</button>`
+            : `<button class="btn btn-primary" onclick="Handlers.startDemoMode()">Bật Demo</button>`}
+        </div>
+      </div>` : ''}
 
       <div class="section-title">Cảnh báo</div>
       <div class="card settings-compact-card warning-card-pro">
@@ -2625,7 +2769,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.82</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.84</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -2635,7 +2779,7 @@ Views.renderSettings = () => {
 
 /* ---------------------------- LOCAL DRAFT / OFFLINE ---------------------------- */
 const DraftService = {
-  key(matchId){ return `quy-doi-bong-draft-${matchId}`; },
+  key(matchId){ return `${window.DemoMode?.isEnabled()?'quy-doi-bong-demo-draft':'quy-doi-bong-draft'}-${matchId}`; },
   save(matchId, patch){
     try {
       const match=MatchService.get(matchId); if(!match) return;
@@ -2697,6 +2841,24 @@ const Handlers = new Proxy({
   copyQrText(){
     const text="Tên Facebook không dấu + đóng quỹ tháng X";
     navigator.clipboard?.writeText(text).then(()=>Snackbar.show("Đã sao chép mẫu nội dung chuyển khoản")).catch(()=>Snackbar.show("Không thể sao chép tự động"));
+  },
+  startDemoMode(){
+    if(!Auth.requireAdmin()) return;
+    if(DemoMode.isEnabled()) return;
+    if(!DemoMode.start(Storage.get())){
+      Snackbar.show('Không thể bật chế độ Demo');
+      return;
+    }
+    Snackbar.show('Đã bật chế độ Demo — dữ liệu thật không bị ảnh hưởng');
+    try { Router.route(); } catch(e) {}
+  },
+  stopDemoMode(){
+    if(!Auth.requireAdmin()) return;
+    if(!DemoMode.isEnabled()) return;
+    if(!confirm('Thoát chế độ Demo và quay lại dữ liệu thật?')) return;
+    DemoMode.stop();
+    Snackbar.show('Đã thoát Demo — dữ liệu thật được khôi phục nguyên trạng');
+    try { Router.route(); } catch(e) {}
   },
   downloadBackup(){
     if(!Auth.isAdmin()) return false;
@@ -3402,7 +3564,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.82</strong>
+          <strong>v1.84</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
