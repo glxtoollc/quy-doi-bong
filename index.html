@@ -840,6 +840,13 @@ input[type="text"],input[type="number"],input[type="date"],select{
 }
 /* Small team add buttons should not become huge. */
 .team-card-header .add-team-btn{padding:6px 10px !important;border-radius:9px !important;}
+.team-card-count{font-size:11px;color:#AFC1D7;font-weight:800;margin-left:auto;margin-right:8px;white-space:nowrap;}
+.team-picker-count{font-size:12px;color:#B7C5D4;margin:2px 0 8px;font-weight:800;}
+.team-fund-sheet .tf-row{align-items:flex-start;}
+.team-fund-sheet .tf-detail{min-width:0;flex:1;}
+.team-fund-sheet .tf-source{font-size:12px;color:#66788B;margin-top:4px;line-height:1.35;}
+.team-fund-sheet .tf-note{font-size:12px;color:#8898A8;margin-top:3px;line-height:1.35;}
+
 /* Native select dropdown cannot be fully themed by CSS in every browser, but its closed control is luxury. */
 select option{background:#0A2E55;color:#fff;}
 
@@ -2466,14 +2473,14 @@ Views.renderMatchForm = (matchId) => {
         <div class="field" style="margin-bottom:0;"><label>Tiền sân (VNĐ)</label><input type="number" value="${match.fieldFee ? Math.round(match.fieldFee / 1000) : ''}" inputmode="numeric" placeholder="VD: 350 = 350.000 VNĐ" oninput="Handlers.autoSaveMatchField('${matchId}','fieldFeeText',this.value)" onchange="Handlers.setFieldFee('${matchId}',this.value)"></div>
       </div>
 
-      <div class="section-title">Chọn đội hình</div>
+      <div class="section-title">Chọn đội hình <span class="section-count">${match.participants.length} cầu thủ</span></div>
       <div class="team-grid">
         <div class="team-card">
-          <div class="team-card-header"><span>Đội 1</span><button class="add-team-btn" onclick="Handlers.openTeamPicker('${matchId}','team1')">＋ Thêm</button></div>
+          <div class="team-card-header"><span>Đội 1</span><span class="team-card-count">${team1.length} người</span><button class="add-team-btn" onclick="Handlers.openTeamPicker('${matchId}','team1')">＋ Thêm</button></div>
           ${teamPlayers(team1)}
         </div>
         <div class="team-card">
-          <div class="team-card-header"><span>Đội 2</span><button class="add-team-btn" onclick="Handlers.openTeamPicker('${matchId}','team2')">＋ Thêm</button></div>
+          <div class="team-card-header"><span>Đội 2</span><span class="team-card-count">${team2.length} người</span><button class="add-team-btn" onclick="Handlers.openTeamPicker('${matchId}','team2')">＋ Thêm</button></div>
           ${teamPlayers(team2)}
         </div>
       </div>
@@ -2676,7 +2683,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.85</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.86</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2790,7 +2797,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.85</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.86</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -3062,7 +3069,15 @@ const Handlers = new Proxy({
     const tf=TeamFundService.ensure();
     const income=tf.transactions.filter(t=>Number(t.amount)>0).reduce((s,t)=>s+Number(t.amount),0);
     const expense=tf.transactions.filter(t=>Number(t.amount)<0).reduce((s,t)=>s+Math.abs(Number(t.amount)),0);
-    const rows=TeamFundService.history().map(t=>`<div class="tf-row"><div><strong>${Utils.escapeHtml(t.reason)}</strong><div class="hint">${Utils.formatDateTime(t.createdAt)}</div></div><span class="${t.amount>=0?'plus':'minus'}">${t.amount>=0?'+':'−'}${Utils.formatCurrency(Math.abs(t.amount))}</span></div>`).join('') || '<div class="hint">Chưa có giao dịch quỹ.</div>';
+    const rows=TeamFundService.history().map(t=>{
+      const member = t.memberId ? MemberService.get(t.memberId) : null;
+      let source = '';
+      if(t.sourceMemberTxId || t.source==='member_transfer') source = `Từ quỹ cá nhân của <strong>${Utils.escapeHtml(member?.name || 'thành viên')}</strong>`;
+      else if(t.sourcePenaltyTxId || t.source==='penalty') source = `Tiền phạt của <strong>${Utils.escapeHtml(member?.name || 'thành viên')}</strong>`;
+      else if(t.source==='admin_income') source = 'Khoản thu do quản trị viên nhập';
+      else if(t.type==='expense') source = 'Chi từ quỹ đội bóng';
+      return `<div class="tf-row"><div class="tf-detail"><strong>${Utils.escapeHtml(t.reason||'Giao dịch quỹ')}</strong>${source?`<div class="tf-source">${source}</div>`:''}<div class="hint">${Utils.formatDateTime(t.createdAt)}</div>${t.note?`<div class="tf-note">${Utils.escapeHtml(t.note)}</div>`:''}</div><span class="${t.amount>=0?'plus':'minus'}">${t.amount>=0?'+':'−'}${Utils.formatCurrency(Math.abs(t.amount))}</span></div>`;
+    }).join('') || '<div class="hint">Chưa có giao dịch quỹ.</div>';
     Dialogs.openSheet(`<div class="team-fund-sheet"><h3>🏆 Quỹ đội bóng</h3><div class="tf-balance">${Utils.formatCurrency(tf.balance)}</div><div class="tf-summary">Thu ${Utils.formatCurrency(income)} · Chi ${Utils.formatCurrency(expense)}</div>${rows}${Auth.isAdmin()?`<div style="margin-top:14px;"><button class="btn btn-primary" style="width:100%;" onclick="Dialogs.closeSheet();Handlers.manageTeamFund()">Quản lý quỹ</button></div>`:''}</div>`);
   },
   manageTeamFund(){
@@ -3385,6 +3400,7 @@ const Handlers = new Proxy({
     Dialogs.openSheet(`
       <div class="team-picker-luxury">
         <h3>Thêm vào ${team==='team1'?'Đội 1':'Đội 2'}</h3>
+        <div class="team-picker-count">Đã thêm ${match.participants.length} cầu thủ · Đội 1: ${match.participants.filter(p=>p.team==='team1').length} · Đội 2: ${match.participants.filter(p=>p.team==='team2').length}</div>
         <input id="team-picker-search" class="team-picker-search" type="text" placeholder="🔍 Tìm tên cầu thủ..." autocomplete="off" oninput="Handlers.filterTeamPicker(this.value)">
         <div id="team-picker-list">${rows || `<div class="empty-state" style="padding:25px 10px;background:transparent;color:#fff;">Không còn thành viên đang tham gia đội bóng để chọn.</div>`}</div>
         <div id="team-picker-no-result" class="team-picker-no-result">Không tìm thấy cầu thủ phù hợp.</div>
@@ -3590,7 +3606,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.85</strong>
+          <strong>v1.86</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
