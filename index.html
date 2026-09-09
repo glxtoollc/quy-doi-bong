@@ -1137,6 +1137,7 @@ body.demo-mode #demo-mode-banner{display:block;}
       s.transactions = [];
       s.matches = [];
       s.teamFund = { transactions: [], balance: 0, migratedPenaltyIds: [] };
+      s.footballFund = { transactions: [], balance: 0 };
       return s;
     }
     function loadPersisted(){
@@ -1359,6 +1360,7 @@ const Storage = (() => {
       transactions: [],
       matches: [],
       teamFund: { transactions: [], balance: 0, migratedPenaltyIds: [] },
+      footballFund: { transactions: [], balance: 0 },
       settings: {
         warningThreshold: 30000,
         penalties: {
@@ -1384,6 +1386,19 @@ const Storage = (() => {
 
   function activeState(){
     return window.DemoMode?.isEnabled() ? window.DemoMode.getState() : state;
+  }
+
+  function normalizeFootballFund(ff){
+    const src=ff && typeof ff==='object' ? ff : {};
+    const ledger=Array.isArray(src.transactions) ? src.transactions.map(t=>({
+      id:t.id||Utils.genId(), type:t.type==='expense'?'expense':'income',
+      amount:Math.round(Number(t.amount)||0), reason:String(t.reason||'').trim(),
+      category:t.category||'other', source:t.source||null, memberId:t.memberId||null,
+      guestId:t.guestId||null, matchId:t.matchId||null,
+      sourceGuestPaymentId:t.sourceGuestPaymentId||null, sourceMatchPaymentId:t.sourceMatchPaymentId||null,
+      createdAt:t.createdAt||new Date().toISOString()
+    })).filter(t=>t.amount!==0 && t.reason) : [];
+    return {transactions:ledger,balance:Math.round(ledger.reduce((sum,t)=>sum+t.amount,0))};
   }
 
   function normalizeTeamFund(tf, transactions){
@@ -1448,6 +1463,7 @@ const Storage = (() => {
             ...defaultState(),
             ...remote,
             teamFund: normalizeTeamFund(remote.teamFund, remote.transactions),
+            footballFund: normalizeFootballFund(remote.footballFund),
             settings: {
               ...defaultState().settings,
               ...(remote.settings || {}),
@@ -1479,6 +1495,7 @@ const Storage = (() => {
               ...defaultState(),
               ...cached,
               teamFund: normalizeTeamFund(cached.teamFund, cached.transactions),
+              footballFund: normalizeFootballFund(cached.footballFund),
               settings:{
                 ...defaultState().settings,
                 ...(cached.settings||{}),
@@ -1778,6 +1795,139 @@ const TeamFundService = {
   }
 };
 
+/* ---------------------------- FOOTBALL FUND v1.91 ---------------------------- */
+const FootballFundService = {
+  ensure(){
+    const s=Storage.get();
+    if(!s.footballFund || typeof s.footballFund!=='object') s.footballFund={transactions:[],balance:0};
+    if(!Array.isArray(s.footballFund.transactions)) s.footballFund.transactions=[];
+    this.recalculate();
+    return s.footballFund;
+  },
+  recalculate(){
+    const s=Storage.get();
+    if(!s.footballFund || typeof s.footballFund!=='object') s.footballFund={transactions:[],balance:0};
+    if(!Array.isArray(s.footballFund.transactions)) s.footballFund.transactions=[];
+    s.footballFund.balance=Math.round(s.footballFund.transactions.reduce((sum,t)=>sum+Number(t.amount||0),0));
+    return s.footballFund.balance;
+  },
+  balance(){ return Math.round(this.ensure().balance||0); },
+  history(){ return [...this.ensure().transactions].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)); },
+  addIncome(amount,reason,meta={}){
+    if(!Auth.isAdmin()) return null;
+    const value=Math.round(Number(amount)||0);
+    if(value<=0 || !String(reason||'').trim()) return null;
+    const s=Storage.get(); this.ensure();
+    const tx={id:Utils.genId(),type:'income',amount:value,reason:String(reason).trim(),createdAt:new Date().toISOString(),...meta};
+    s.footballFund.transactions.push(tx); this.recalculate(); Storage.save(); return tx;
+  },
+  addExpense(amount,reason,meta={}){
+    if(!Auth.isAdmin()) return null;
+    const value=Math.round(Number(amount)||0);
+    if(value<=0 || value>this.balance() || !String(reason||'').trim()) return null;
+    const s=Storage.get(); this.ensure();
+    const tx={id:Utils.genId(),type:'expense',amount:-value,reason:String(reason).trim(),createdAt:new Date().toISOString(),...meta};
+    s.footballFund.transactions.push(tx); this.recalculate(); Storage.save(); return tx;
+  },
+  removeMatchEntries(matchId, save=true){
+    if(!Auth.isAdmin()) return false;
+    const s=Storage.get(); this.ensure();
+    const before=s.footballFund.transactions.length;
+    s.footballFund.transactions=s.footballFund.transactions.filter(t=>t.matchId!==matchId);
+    const changed=before!==s.footballFund.transactions.length;
+    if(changed){ this.recalculate(); if(save) Storage.save(); }
+    return changed;
+  },
+  syncMatch(match, save=true){
+    if(!Auth.isAdmin() || !match || match.status!==MatchStatus.COMPLETED) return false;
+    const s=Storage.get(); this.ensure();
+    // Rebuild this match's football-fund entries so edits/re-saves never duplicate money.
+    s.footballFund.transactions=s.footballFund.transactions.filter(t=>t.matchId!==match.id);
+    let changed=true;
+    const amounts=Array.isArray(match.perPersonAmounts)?match.perPersonAmounts:[];
+    (match.participants||[]).forEach(p=>{
+      const a=amounts.find(x=>x.refType===p.refType && x.refId===p.refId);
+      const amount=Math.round(Number(a?.amount)||0);
+      if(amount<=0) return;
+      if(p.refType==='member'){
+        const member=MemberService.get(p.refId);
+        s.footballFund.transactions.push({
+          id:Utils.genId(),type:'income',amount,
+          reason:`${member?.name||'Thành viên'} — đóng tiền trận đấu`,
+          category:'match_payment',source:'member_match_payment',memberId:p.refId,
+          matchId:match.id,sourceMatchPaymentId:`${match.id}:member:${p.refId}`,
+          createdAt:match.updatedAt||new Date().toISOString()
+        });
+      } else if(p.refType==='guest'){
+        const guest=(match.guests||[]).find(g=>g.id===p.refId);
+        if(guest?.paid){
+          s.footballFund.transactions.push({
+            id:Utils.genId(),type:'income',amount,
+            reason:`Khách ${guest.name} — đóng tiền trận đấu`,
+            category:'match_payment',source:'guest_payment',guestId:p.refId,
+            matchId:match.id,sourceMatchPaymentId:`${match.id}:guest:${p.refId}`,
+            createdAt:match.updatedAt||new Date().toISOString()
+          });
+        }
+      }
+    });
+    const fieldFee=Math.round(Number(match.fieldFee)||0);
+    if(fieldFee>0){
+      s.footballFund.transactions.push({
+        id:Utils.genId(),type:'expense',amount:-fieldFee,
+        reason:`Tiền sân — ${match.location||'Trận đấu'}`,
+        category:'field_fee',source:'match_field_fee',matchId:match.id,
+        createdAt:match.updatedAt||new Date().toISOString()
+      });
+    }
+    this.recalculate();
+    if(save) Storage.save();
+    return changed;
+  },
+  syncAllCompletedMatches(save=true){
+    if(!Auth.isAdmin()) return false;
+    const s=Storage.get(); this.ensure();
+    const manual=s.footballFund.transactions.filter(t=>!t.matchId);
+    const rebuilt=[...manual];
+    s.footballFund.transactions=rebuilt;
+    (s.matches||[]).filter(m=>m.status===MatchStatus.COMPLETED).forEach(match=>{
+      const amounts=Array.isArray(match.perPersonAmounts)?match.perPersonAmounts:[];
+      (match.participants||[]).forEach(p=>{
+        const a=amounts.find(x=>x.refType===p.refType && x.refId===p.refId);
+        const amount=Math.round(Number(a?.amount)||0);
+        if(amount<=0) return;
+        if(p.refType==='member'){
+          const member=MemberService.get(p.refId);
+          s.footballFund.transactions.push({id:Utils.genId(),type:'income',amount,reason:`${member?.name||'Thành viên'} — đóng tiền trận đấu`,category:'match_payment',source:'member_match_payment',memberId:p.refId,matchId:match.id,sourceMatchPaymentId:`${match.id}:member:${p.refId}`,createdAt:match.updatedAt||new Date().toISOString()});
+        }else if(p.refType==='guest'){
+          const guest=(match.guests||[]).find(g=>g.id===p.refId);
+          if(guest?.paid) s.footballFund.transactions.push({id:Utils.genId(),type:'income',amount,reason:`Khách ${guest.name} — đóng tiền trận đấu`,category:'match_payment',source:'guest_payment',guestId:p.refId,matchId:match.id,sourceMatchPaymentId:`${match.id}:guest:${p.refId}`,createdAt:match.updatedAt||new Date().toISOString()});
+        }
+      });
+      const fieldFee=Math.round(Number(match.fieldFee)||0);
+      if(fieldFee>0) s.footballFund.transactions.push({id:Utils.genId(),type:'expense',amount:-fieldFee,reason:`Tiền sân — ${match.location||'Trận đấu'}`,category:'field_fee',source:'match_field_fee',matchId:match.id,createdAt:match.updatedAt||new Date().toISOString()});
+    });
+    this.recalculate();
+    if(save) Storage.save();
+    return true;
+  },
+  migrateLegacyGuestPayments(){
+    if(!Auth.isAdmin()) return false;
+    const s=Storage.get(); this.ensure();
+    // Guest payments created by v1.90 lived in the common-fund ledger. Move them here.
+    const legacy=(s.teamFund?.transactions||[]).filter(t=>t.sourceGuestPaymentId||t.source==='guest_payment');
+    if(!legacy.length) return false;
+    legacy.forEach(t=>{
+      const exists=s.footballFund.transactions.some(x=>x.sourceGuestPaymentId===t.sourceGuestPaymentId);
+      if(!exists){
+        s.footballFund.transactions.push({...t,category:'match_payment'});
+      }
+    });
+    s.teamFund.transactions=(s.teamFund.transactions||[]).filter(t=>!(t.sourceGuestPaymentId||t.source==='guest_payment'));
+    this.recalculate(); Storage.save(); return true;
+  }
+};
+
 const TransactionService = {
   forMember(memberId){
     return Storage.get().transactions
@@ -2038,14 +2188,14 @@ const MatchService = {
     savedMatch.perPersonAmounts = perPersonAmounts;
     savedMatch.status = MatchStatus.COMPLETED;
     savedMatch.updatedAt = new Date().toISOString();
-    TeamFundService.syncAllGuestPayments(false);
+    FootballFundService.syncMatch(savedMatch,false);
     if(!Storage.save()) return { ok:false, errors:['Không thể lưu trạng thái trận đấu'] };
     return { ok:true };
   },
 
   cancel(matchId){
     const match = this.get(matchId); if(!match) return;
-    if(match.status === MatchStatus.COMPLETED){ TransactionService.reverseMatch(matchId); }
+    if(match.status === MatchStatus.COMPLETED){ TransactionService.reverseMatch(matchId); FootballFundService.removeMatchEntries(matchId,false); }
     match.status = MatchStatus.CANCELLED;
     match.updatedAt = new Date().toISOString();
     Storage.save();
@@ -2204,8 +2354,9 @@ const CLUB_LOGO_SVG = `
 
 /* ---- 0. TRANG CHỦ ---- */
 Views.renderHome = () => {
+  if(Auth.isAdmin()) FootballFundService.migrateLegacyGuestPayments();
   const app = document.getElementById('app');
-  if(Auth.isAdmin()) TeamFundService.syncAllGuestPayments(true);
+  if(Auth.isAdmin()) FootballFundService.syncAllCompletedMatches(true);
   const members = Utils.sortMembersByLastName(MemberService.list());
   const settings = Storage.get().settings;
   const balances = members.map(m => ({ member:m, balance:TransactionService.balanceOf(m.id) }));
@@ -2278,13 +2429,13 @@ Views.renderHome = () => {
       </div>
 
       <div class="card team-fund-card-v181">
-        <div class="gfc-fund-head"><span class="gfc-fund-icon">🏆</span><span class="gfc-fund-label">QUỸ ĐỘI BÓNG</span></div>
-        <div class="gfc-fund-caption">Tiền phạt và các khoản thu/chi chung của đội</div>
-        <div class="gfc-fund-value fund-positive">${Utils.formatCurrency(TeamFundService.balance())}</div>
-        <div class="team-fund-v181-meta">${(() => { const tf=TeamFundService.ensure(); const inc=tf.transactions.filter(t=>t.amount>0).reduce((s,t)=>s+Number(t.amount||0),0); const exp=tf.transactions.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(Number(t.amount||0)),0); return `Tổng thu ${Utils.formatCurrency(inc)} · Tổng chi ${Utils.formatCurrency(exp)}`; })()}</div>
+        <div class="gfc-fund-head"><span class="gfc-fund-icon">⚽</span><span class="gfc-fund-label">QUỸ ĐỘI BÓNG</span></div>
+        <div class="gfc-fund-caption">Tiền mọi người đóng để đá bóng và các khoản chi phục vụ đá bóng</div>
+        <div class="gfc-fund-value fund-positive">${Utils.formatCurrency(FootballFundService.balance())}</div>
+        <div class="team-fund-v181-meta">${(() => { const tf=FootballFundService.ensure(); const inc=tf.transactions.filter(t=>t.amount>0).reduce((s,t)=>s+Number(t.amount||0),0); const exp=tf.transactions.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(Number(t.amount||0)),0); return `Tổng thu ${Utils.formatCurrency(inc)} · Tổng chi ${Utils.formatCurrency(exp)}`; })()}</div>
         <div class="team-fund-v181-actions">
-          <button class="btn btn-outline" onclick="Handlers.viewTeamFund()">Xem lịch sử</button>
-          ${Auth.isAdmin()?`<button class="btn btn-primary" onclick="Handlers.manageTeamFund()">Quản lý quỹ</button>`:''}
+          <button class="btn btn-outline" onclick="Handlers.viewFootballFund()">Xem lịch sử</button>
+          ${Auth.isAdmin()?`<button class="btn btn-primary" onclick="Handlers.manageFootballFund()">Quản lý quỹ</button>`:''}
         </div>
       </div>
 
@@ -2769,6 +2920,10 @@ Views.renderMatchResult = (matchId) => {
 Views.renderTransactions = () => {
   const app = document.getElementById('app');
   const state = Storage.get();
+  if(Auth.isAdmin()) FootballFundService.migrateLegacyGuestPayments();
+  const footballFund=FootballFundService.ensure();
+  const footballIncome=footballFund.transactions.filter(t=>Number(t.amount)>0).reduce((s,t)=>s+Number(t.amount),0);
+  const footballExpense=footballFund.transactions.filter(t=>Number(t.amount)<0).reduce((s,t)=>s+Math.abs(Number(t.amount)),0);
   const members = Object.fromEntries(state.members.map(m => [m.id, m]));
   const typeLabel = { deposit:'Đóng quỹ', match_cost:'Chi phí trận đấu', penalty:'Tiền phạt', adjustment:'Điều chỉnh', reversal:'Hoàn tiền' };
   const dates = state.transactions.map(t=>new Date(t.createdAt)).filter(d=>!isNaN(d));
@@ -2784,7 +2939,7 @@ Views.renderTransactions = () => {
     return `<div class="gfc-tx-row" data-tx-member-name="${Utils.escapeHtml(memberName).toLowerCase()}"><div class="gfc-tx-date">${Utils.formatDateTime(t.createdAt)}</div><div><div class="gfc-tx-member">${Utils.escapeHtml(memberName)}</div><div class="gfc-tx-note">${typeLabel[t.type] || t.type}</div></div><div class="gfc-tx-amount ${plus?'plus':'minus'}">${Utils.formatSigned(t.amount)}${adminDelete}</div></div>`;
   }).join('');
   const months=['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
-  app.innerHTML = `${Views.topbar('Lịch sử giao dịch', null)}<div class="view"><div class="tx-filter-card"><select aria-label="Lọc theo tháng" onchange="Handlers.setTxMonth(this.value)"><option value="">Tháng — Tất cả</option>${months.map((m,i)=>`<option value="${i+1}" ${txFilterMonth===String(i+1)?'selected':''}>${m}</option>`).join('')}</select><select aria-label="Lọc theo năm" onchange="Handlers.setTxYear(this.value)"><option value="">Năm — Tất cả</option>${years.map(y=>`<option value="${y}" ${txFilterYear===String(y)?'selected':''}>${y}</option>`).join('')}</select><div class="tx-member-search-wrap"><span class="tx-member-search-icon">🔍</span><input id="tx-member-search" class="tx-member-search" type="search" autocomplete="off" placeholder="Tìm tên cầu thủ..." value="${Utils.escapeHtml(txFilterMemberSearch)}" oninput="Handlers.setTxMemberSearch(this.value)"><button id="tx-member-search-clear" class="tx-member-search-clear" type="button" onclick="Handlers.clearTxMemberSearch()" aria-label="Xóa tìm kiếm">×</button></div></div><div class="card gfc-page-card"><div class="gfc-page-title"><span class="ico">↔</span> <span id="tx-count">${txs.length}</span> giao dịch</div><div id="tx-rows">${rows}</div><div id="tx-filter-empty" class="tx-filter-empty">Không tìm thấy giao dịch của cầu thủ này.</div>${txs.length===0 ? `<div class="gfc-empty-page"><div class="empty-icon">▤</div><strong>Không có giao dịch phù hợp.</strong></div>` : ''}</div></div>`;
+  app.innerHTML = `${Views.topbar('Lịch sử giao dịch', null)}<div class="view"><div class="card team-fund-card-v181" style="margin-bottom:12px;"><div class="gfc-fund-head"><span class="gfc-fund-icon">⚽</span><span class="gfc-fund-label">QUỸ ĐỘI BÓNG</span></div><div class="team-fund-v181-meta">Tổng thu <strong>${Utils.formatCurrency(footballIncome)}</strong> · Tổng chi <strong>${Utils.formatCurrency(footballExpense)}</strong> · Số dư <strong>${Utils.formatCurrency(footballFund.balance)}</strong></div><button class="btn btn-outline" style="width:100%;margin-top:10px;" onclick="Handlers.viewFootballFund()">Xem lịch sử quỹ đội bóng</button></div><div class="tx-filter-card"><select aria-label="Lọc theo tháng" onchange="Handlers.setTxMonth(this.value)"><option value="">Tháng — Tất cả</option>${months.map((m,i)=>`<option value="${i+1}" ${txFilterMonth===String(i+1)?'selected':''}>${m}</option>`).join('')}</select><select aria-label="Lọc theo năm" onchange="Handlers.setTxYear(this.value)"><option value="">Năm — Tất cả</option>${years.map(y=>`<option value="${y}" ${txFilterYear===String(y)?'selected':''}>${y}</option>`).join('')}</select><div class="tx-member-search-wrap"><span class="tx-member-search-icon">🔍</span><input id="tx-member-search" class="tx-member-search" type="search" autocomplete="off" placeholder="Tìm tên cầu thủ..." value="${Utils.escapeHtml(txFilterMemberSearch)}" oninput="Handlers.setTxMemberSearch(this.value)"><button id="tx-member-search-clear" class="tx-member-search-clear" type="button" onclick="Handlers.clearTxMemberSearch()" aria-label="Xóa tìm kiếm">×</button></div></div><div class="card gfc-page-card"><div class="gfc-page-title"><span class="ico">↔</span> <span id="tx-count">${txs.length}</span> giao dịch</div><div id="tx-rows">${rows}</div><div id="tx-filter-empty" class="tx-filter-empty">Không tìm thấy giao dịch của cầu thủ này.</div>${txs.length===0 ? `<div class="gfc-empty-page"><div class="empty-icon">▤</div><strong>Không có giao dịch phù hợp.</strong></div>` : ''}</div></div>`;
   Handlers.applyTxMemberSearch(txFilterMemberSearch);
 };
 
@@ -2797,7 +2952,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.90</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.91</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2911,7 +3066,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.90</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.91</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -3048,7 +3203,7 @@ const Handlers = new Proxy({
   },
   refreshApp(){
     const hash = location.hash || '';
-    const url = `${location.pathname}?app=1.88&r=${Date.now()}${hash}`;
+    const url = `${location.pathname}?app=1.91&r=${Date.now()}${hash}`;
     Snackbar.show('Đang tải phiên bản mới...');
     setTimeout(() => { window.location.replace(url); }, 120);
   },
@@ -3126,7 +3281,7 @@ const Handlers = new Proxy({
       const value=Math.round(Number(amount)||0);
       if(value<=0) return Snackbar.show('Số tiền không hợp lệ.');
       if(value>TransactionService.balanceOf(memberId)) return Snackbar.show('Số dư cá nhân không đủ.');
-      Dialogs.confirm(`Chuyển ${Utils.formatCurrency(value)} từ quỹ cá nhân của ${Utils.escapeHtml(member.name)} sang Quỹ đội bóng?\n\nĐây là chuyển nội bộ, không phải tiền phạt.`, ()=>{
+      Dialogs.confirm(`Chuyển ${Utils.formatCurrency(value)} từ quỹ cá nhân của ${Utils.escapeHtml(member.name)} sang Quỹ chung?\n\nĐây là chuyển nội bộ, không phải tiền phạt.`, ()=>{
         const result=TeamFundService.transferFromMember(memberId,value,'Đóng quỹ chung');
         if(!result) return Snackbar.show('Không thể chuyển quỹ.');
         Snackbar.show(`Đã chuyển ${Utils.formatCurrency(value)} vào quỹ đội bóng`);
@@ -3171,8 +3326,45 @@ const Handlers = new Proxy({
       Views.renderMemberDetail(memberId);
     }, true);
   },
-  viewTeamFund(){
-    if(Auth.isAdmin()) TeamFundService.syncAllGuestPayments(true);
+  viewFootballFund(){
+    if(Auth.isAdmin()) FootballFundService.migrateLegacyGuestPayments();
+    const ff=FootballFundService.ensure();
+    const income=ff.transactions.filter(t=>Number(t.amount)>0).reduce((s,t)=>s+Number(t.amount),0);
+    const expense=ff.transactions.filter(t=>Number(t.amount)<0).reduce((s,t)=>s+Math.abs(Number(t.amount)),0);
+    const rows=FootballFundService.history().map(t=>{
+      const member=t.memberId ? MemberService.get(t.memberId) : null;
+      let source='';
+      if(t.source==='member_match_payment') source=`Tiền đóng trận của <strong>${Utils.escapeHtml(member?.name||'thành viên')}</strong>`;
+      else if(t.source==='guest_payment') source=`Tiền khách <strong>${Utils.escapeHtml((t.reason||'').replace(/^Khách /,'').replace(/ — đóng tiền trận đấu$/,''))}</strong> đã đóng`;
+      else if(t.source==='match_field_fee') source='Chi tiền sân của trận đấu';
+      else if(t.source==='football_manual_income') source='Khoản thu bóng đá do quản trị viên nhập';
+      else if(t.source==='football_manual_expense') source='Khoản chi phục vụ đội bóng';
+      return `<div class="tf-row"><div class="tf-detail"><strong>${Utils.escapeHtml(t.reason||'Giao dịch quỹ')}</strong>${source?`<div class="tf-source">${source}</div>`:''}<div class="hint">${Utils.formatDateTime(t.createdAt)}</div></div><span class="${t.amount>=0?'plus':'minus'}">${t.amount>=0?'+':'−'}${Utils.formatCurrency(Math.abs(t.amount))}</span></div>`;
+    }).join('') || '<div class="hint">Chưa có giao dịch quỹ đội bóng.</div>';
+    Dialogs.openSheet(`<div class="team-fund-sheet"><h3>⚽ Quỹ đội bóng</h3><div class="tf-balance">${Utils.formatCurrency(ff.balance)}</div><div class="tf-summary"><strong>Tổng thu</strong> ${Utils.formatCurrency(income)} · <strong>Tổng chi</strong> ${Utils.formatCurrency(expense)}</div>${rows}${Auth.isAdmin()?`<div style="margin-top:14px;"><button class="btn btn-primary" style="width:100%;" onclick="Dialogs.closeSheet();Handlers.manageFootballFund()">Quản lý quỹ đội bóng</button></div>`:''}</div>`);
+  },
+  manageFootballFund(){
+    if(!Auth.requireAdmin()) return false;
+    const balance=FootballFundService.balance();
+    Dialogs.openSheet(`<div class="team-fund-sheet"><h3>⚽ Quản lý quỹ đội bóng</h3><div class="tf-balance">${Utils.formatCurrency(balance)}</div>
+      <div class="field"><label>Loại giao dịch</label><select id="football-fund-type"><option value="income">Thu vào</option><option value="expense">Chi ra</option></select></div>
+      <div class="field"><label>Số tiền</label><input id="football-fund-amount" type="number" min="1000" step="1000" inputmode="numeric" placeholder="VD: 120000"></div>
+      <div class="field"><label>Nội dung</label><input id="football-fund-reason" maxlength="160" placeholder="VD: Mua bóng mới"></div>
+      <div class="hint">Chỉ dùng cho các khoản phục vụ đá bóng. Tiền thành viên và khách đóng trận sẽ tự cộng vào quỹ; tiền sân tự động tính vào tổng chi.</div>
+      <div class="dialog-actions" style="margin-top:14px;"><button class="btn btn-outline" onclick="Dialogs.closeSheet()">Hủy</button><button class="btn btn-primary" onclick="Handlers.saveFootballFundTransaction()">Lưu</button></div></div>`);
+  },
+  saveFootballFundTransaction(){
+    if(!Auth.requireAdmin()) return false;
+    const type=document.getElementById('football-fund-type')?.value;
+    const amount=Math.round(Number(document.getElementById('football-fund-amount')?.value)||0);
+    const reason=(document.getElementById('football-fund-reason')?.value||'').trim();
+    if(amount<=0) return Snackbar.show('Số tiền phải lớn hơn 0.');
+    if(!reason) return Snackbar.show('Vui lòng nhập nội dung.');
+    const tx=type==='income' ? FootballFundService.addIncome(amount,reason,{source:'football_manual_income'}) : FootballFundService.addExpense(amount,reason,{source:'football_manual_expense'});
+    if(!tx) return Snackbar.show(type==='expense'?'Số dư quỹ đội bóng không đủ.':'Không thể ghi giao dịch.');
+    Dialogs.closeSheet(); Views.renderHome(); Snackbar.show(type==='income'?`Đã thu ${Utils.formatCurrency(amount)}`:`Đã chi ${Utils.formatCurrency(amount)}`);
+  },
+  viewCommonFund(){
     const tf=TeamFundService.ensure();
     const income=tf.transactions.filter(t=>Number(t.amount)>0).reduce((s,t)=>s+Number(t.amount),0);
     const expense=tf.transactions.filter(t=>Number(t.amount)<0).reduce((s,t)=>s+Math.abs(Number(t.amount)),0);
@@ -3183,19 +3375,19 @@ const Handlers = new Proxy({
       else if(t.sourcePenaltyTxId || t.source==='penalty') source = `Tiền phạt của <strong>${Utils.escapeHtml(member?.name || 'thành viên')}</strong>`;
       else if(t.sourceGuestPaymentId || t.source==='guest_payment') source = `Tiền khách <strong>${Utils.escapeHtml((t.reason||'').replace(/ — đóng tiền trận đấu$/,'').replace(/^Khách /,'') || 'khách')}</strong> đã đóng`;
       else if(t.source==='admin_income') source = 'Khoản thu do quản trị viên nhập';
-      else if(t.type==='expense') source = 'Chi từ quỹ đội bóng';
+      else if(t.type==='expense') source = 'Chi từ quỹ chung';
       return `<div class="tf-row"><div class="tf-detail"><strong>${Utils.escapeHtml(t.reason||'Giao dịch quỹ')}</strong>${source?`<div class="tf-source">${source}</div>`:''}<div class="hint">${Utils.formatDateTime(t.createdAt)}</div>${t.note?`<div class="tf-note">${Utils.escapeHtml(t.note)}</div>`:''}</div><span class="${t.amount>=0?'plus':'minus'}">${t.amount>=0?'+':'−'}${Utils.formatCurrency(Math.abs(t.amount))}</span></div>`;
     }).join('') || '<div class="hint">Chưa có giao dịch quỹ.</div>';
-    Dialogs.openSheet(`<div class="team-fund-sheet"><h3>🏆 Quỹ đội bóng</h3><div class="tf-balance">${Utils.formatCurrency(tf.balance)}</div><div class="tf-summary">Thu ${Utils.formatCurrency(income)} · Chi ${Utils.formatCurrency(expense)}</div>${rows}${Auth.isAdmin()?`<div style="margin-top:14px;"><button class="btn btn-primary" style="width:100%;" onclick="Dialogs.closeSheet();Handlers.manageTeamFund()">Quản lý quỹ</button></div>`:''}</div>`);
+    Dialogs.openSheet(`<div class="team-fund-sheet"><h3>💰 Quỹ chung</h3><div class="tf-balance">${Utils.formatCurrency(tf.balance)}</div><div class="tf-summary">Thu ${Utils.formatCurrency(income)} · Chi ${Utils.formatCurrency(expense)}</div>${rows}${Auth.isAdmin()?`<div style="margin-top:14px;"><button class="btn btn-primary" style="width:100%;" onclick="Dialogs.closeSheet();Handlers.manageCommonFund()">Quản lý quỹ</button></div>`:''}</div>`);
   },
-  manageTeamFund(){
+  manageCommonFund(){
     if(!Auth.requireAdmin()) return false;
     const balance=TeamFundService.balance();
-    Dialogs.openSheet(`<div class="team-fund-sheet"><h3>🏆 Quản lý quỹ đội bóng</h3><div class="tf-balance">${Utils.formatCurrency(balance)}</div>
+    Dialogs.openSheet(`<div class="team-fund-sheet"><h3>💰 Quản lý quỹ chung</h3><div class="tf-balance">${Utils.formatCurrency(balance)}</div>
       <div class="field"><label>Loại giao dịch</label><select id="team-fund-type"><option value="income">Thu vào</option><option value="expense">Chi ra</option></select></div>
       <div class="field"><label>Số tiền</label><input id="team-fund-amount" type="number" min="1000" step="1000" inputmode="numeric" placeholder="VD: 120000"></div>
       <div class="field"><label>Nội dung</label><input id="team-fund-reason" maxlength="160" placeholder="VD: Ăn nhậu tổng kết tháng 8"></div>
-      <div class="hint">Tiền phạt và tiền chuyển từ quỹ cá nhân tự động cộng vào quỹ đội bóng. Chi quỹ chỉ cần nhập số tiền + nội dung. Không thể chi vượt số dư.</div>
+      <div class="hint">Tiền phạt và tiền chuyển từ quỹ cá nhân tự động cộng vào quỹ chung. Chi quỹ chỉ cần nhập số tiền + nội dung. Không thể chi vượt số dư.</div>
       <div class="dialog-actions" style="margin-top:14px;"><button class="btn btn-outline" onclick="Dialogs.closeSheet()">Hủy</button><button class="btn btn-primary" onclick="Handlers.saveTeamFundTransaction()">Lưu</button></div></div>`);
   },
   teamFundTypeChanged(){
@@ -3217,7 +3409,7 @@ const Handlers = new Proxy({
     const reason=(document.getElementById('team-fund-reason')?.value||'').trim();
     if(amount<=0) return Snackbar.show('Số tiền phải lớn hơn 0.');
     if(!reason) return Snackbar.show('Vui lòng nhập nội dung.');
-    if(type==='expense' && amount>TeamFundService.balance()) return Snackbar.show('Quỹ đội bóng không đủ tiền.');
+    if(type==='expense' && amount>TeamFundService.balance()) return Snackbar.show('Quỹ chung không đủ tiền.');
     const tx=type==='income'
       ? TeamFundService.addIncome(amount,reason,{source:'admin_manual'})
       : TeamFundService.addExpense(amount,reason,'other');
@@ -3596,7 +3788,7 @@ const Handlers = new Proxy({
     if(!match || !guest) return;
     const paid=!guest.paid;
     MatchService.setGuestPaid(matchId, guestId, paid);
-    if(match.status===MatchStatus.COMPLETED) TeamFundService.syncGuestPayment(match, guestId, true);
+    if(match.status===MatchStatus.COMPLETED) FootballFundService.syncMatch(match, true);
     Views.renderMatchForm(matchId);
   },
   toggleGuestPaidInResult(matchId, guestId){
@@ -3605,7 +3797,7 @@ const Handlers = new Proxy({
     if(!match || !guest) return;
     const paid=!guest.paid;
     MatchService.setGuestPaid(matchId, guestId, paid);
-    if(match.status===MatchStatus.COMPLETED) TeamFundService.syncGuestPayment(match, guestId, true);
+    if(match.status===MatchStatus.COMPLETED) FootballFundService.syncMatch(match, true);
     Views.renderMatchResult(matchId);
   },
   setTeam(matchId, refType, refId, team){
@@ -3740,7 +3932,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.90</strong>
+          <strong>v1.91</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
@@ -3759,7 +3951,7 @@ const Handlers = new Proxy({
       'openAddMember','saveInlineMember','closeAddMember','depositPrompt','memberDebitPrompt','saveMemberDebit','refundMemberTransaction','editDepositPrompt','deleteTransactionPrompt','memberMenu','renamePrompt','confirmSetStatus','deleteMemberPrompt',
       'setMatchDateText','toggleLocationPicker','chooseLocation','saveLocation','openDetailedTime','toggleHourPicker','toggleMinutePicker','chooseHour','setHourChoice','chooseMinute','setMinuteChoice',
       'setField','setFieldFee','addParticipant','removeParticipant','openTeamPicker','pickMemberForTeam','addGuestPrompt','toggleGuestPaidInForm','toggleGuestPaidInResult','setTeam','setRatio','customRatioPrompt',
-      'confirmLineup','backToMatchForm','setWinner','calculatePreview','confirmMatch','discardDraft','cancelMatchPrompt','setWarningThreshold','setTheme','editWarningThreshold','saveWarningThreshold','penaltyPrompt','confirmPenalty','savePenaltySettings','downloadBackup','manageTeamFund','saveTeamFundTransaction','teamFundTypeChanged','teamFundCategoryChanged','teamFundTransferPrompt',]);
+      'confirmLineup','backToMatchForm','setWinner','calculatePreview','confirmMatch','discardDraft','cancelMatchPrompt','setWarningThreshold','setTheme','editWarningThreshold','saveWarningThreshold','penaltyPrompt','confirmPenalty','savePenaltySettings','downloadBackup','viewFootballFund','manageFootballFund','saveFootballFundTransaction','viewCommonFund','manageCommonFund','teamFundTypeChanged','teamFundCategoryChanged','teamFundTransferPrompt',]);
 
     if (!mutating.has(prop)) return value;
     return function(...args){
