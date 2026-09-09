@@ -149,7 +149,11 @@
 
   .team-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .team-card{background:linear-gradient(145deg,#08284E,#061A34);color:#fff;border:1px solid #477EAF;border-radius:16px;padding:12px;min-width:0;box-shadow:0 8px 20px rgba(0,0,0,.16);}
-  .team-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-weight:800;font-size:14px;color:#fff;}
+  .team-card-footer{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}
+.team-card-footer .add-team-btn{flex:1;min-width:0}
+.result-match-status,.result-final-match-status{font-weight:800;margin-bottom:12px}
+.result-match-status.draw,.result-final-match-status.draw{color:#f2b84b}
+.team-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-weight:800;font-size:14px;color:#fff;}
   .team-card-header .add-team-btn{border:1px solid var(--gfc-gold);background:transparent;color:#fff;border-radius:9px;padding:6px 9px;font-size:12px;font-weight:800;cursor:pointer;}
   .team-player{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.14);font-size:13px;color:#fff;}
   .team-player > span{color:#fff !important;font-weight:700;}
@@ -1845,7 +1849,7 @@ const MatchService = {
       ratio: data.ratio,
       status: MatchStatus.DRAFT,
       setupConfirmed: false,
-      participants: [], guests: [], winningTeam: null,
+      participants: [], guests: [], winningTeam: null, result: null,
       perPersonAmounts: [],
       createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     };
@@ -1910,7 +1914,7 @@ const MatchService = {
     const errors = [];
     if(!match.fieldFee || match.fieldFee <= 0) errors.push('Tiền sân không hợp lệ');
     if(!match.ratio) errors.push('Chưa chọn tỷ lệ chia');
-    if(!match.winningTeam) errors.push('Chưa chọn đội thắng');
+    if(!match.winningTeam && match.result !== 'draw') errors.push('Chưa chọn kết quả trận đấu');
 
     const teams = { team1: [], team2: [] };
     match.participants.forEach(p => { if(teams[p.team]) teams[p.team].push(p); });
@@ -1920,11 +1924,16 @@ const MatchService = {
     }
     if(errors.length) return { perPersonAmounts: [], totalCollected: 0, errors };
 
+    const isDraw = match.result === 'draw';
     const winTeam = match.winningTeam;
     const loseTeam = winTeam === 'team1' ? 'team2' : 'team1';
-    const winCost = Math.round(match.fieldFee * match.ratio.winningShare / 100);
-    const loseCost = Math.round(match.fieldFee * match.ratio.losingShare / 100);
-    const teamCost = { [winTeam]: winCost, [loseTeam]: loseCost };
+    const teamCost = isDraw
+      ? { team1: Math.round(match.fieldFee / 2), team2: match.fieldFee - Math.round(match.fieldFee / 2) }
+      : (() => {
+          const winCost = Math.round(match.fieldFee * match.ratio.winningShare / 100);
+          const loseCost = Math.round(match.fieldFee * match.ratio.losingShare / 100);
+          return { [winTeam]: winCost, [loseTeam]: loseCost };
+        })();
 
     const perPersonAmounts = [];
     let totalCollected = 0;
@@ -2520,12 +2529,14 @@ Views.renderMatchForm = (matchId) => {
       <div class="section-title">Chọn đội hình <span class="section-count">${match.participants.length} cầu thủ</span></div>
       <div class="team-grid">
         <div class="team-card">
-          <div class="team-card-header"><span>Đội 1</span><span class="team-card-count">${team1.length} người</span><button class="add-team-btn" onclick="Handlers.openTeamPicker('${matchId}','team1')">＋ Thêm</button><button class="add-team-btn" onclick="Handlers.addGuestPrompt('${matchId}','team1')">＋ Khách</button></div>
+          <div class="team-card-header"><span>Đội 1</span><span class="team-card-count">${team1.length} người</span></div>
           ${teamPlayers(team1)}
+          <div class="team-card-footer"><button class="add-team-btn" type="button" onclick="Handlers.openTeamPicker('${matchId}','team1')">＋ Thêm cầu thủ</button><button class="add-team-btn" type="button" onclick="Handlers.addGuestPrompt('${matchId}','team1')">＋ Thêm khách</button></div>
         </div>
         <div class="team-card">
-          <div class="team-card-header"><span>Đội 2</span><span class="team-card-count">${team2.length} người</span><button class="add-team-btn" onclick="Handlers.openTeamPicker('${matchId}','team2')">＋ Thêm</button><button class="add-team-btn" onclick="Handlers.addGuestPrompt('${matchId}','team2')">＋ Khách</button></div>
+          <div class="team-card-header"><span>Đội 2</span><span class="team-card-count">${team2.length} người</span></div>
           ${teamPlayers(team2)}
+          <div class="team-card-footer"><button class="add-team-btn" type="button" onclick="Handlers.openTeamPicker('${matchId}','team2')">＋ Thêm cầu thủ</button><button class="add-team-btn" type="button" onclick="Handlers.addGuestPrompt('${matchId}','team2')">＋ Thêm khách</button></div>
         </div>
       </div>
 
@@ -2564,6 +2575,7 @@ Views.renderMatchResultSetup = (matchId) => {
   const team1 = match.participants.filter(p=>p.team==='team1');
   const team2 = match.participants.filter(p=>p.team==='team2');
   const playerLines = team => team.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span></div>`).join('');
+  const isDraw = match.result === 'draw';
 
   let calculationHtml = '';
   if(lastPreview && lastPreview.matchId === matchId){
@@ -2571,23 +2583,22 @@ Views.renderMatchResultSetup = (matchId) => {
     if(errors.length){
       calculationHtml = `<div class="banner danger">${errors.map(Utils.escapeHtml).join('<br>')}</div>`;
     } else {
-      const winningTeam = match.winningTeam;
-      const losingTeam = winningTeam === 'team1' ? 'team2' : 'team1';
-      const winningPeople = perPersonAmounts.filter(p=>p.team===winningTeam);
-      const losingPeople = perPersonAmounts.filter(p=>p.team===losingTeam);
-      const winningLines = winningPeople.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
-      const losingLines = losingPeople.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
-      const winningTotal = winningPeople.reduce((s,p)=>s+p.amount,0);
-      const losingTotal = losingPeople.reduce((s,p)=>s+p.amount,0);
+      const team1People = perPersonAmounts.filter(p=>p.team==='team1');
+      const team2People = perPersonAmounts.filter(p=>p.team==='team2');
+      const team1Lines = team1People.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+      const team2Lines = team2People.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${p.refType==='guest' ? ' <span class="badge badge-guest">Khách</span>' : ''}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+      const team1Total = team1People.reduce((sum,p)=>sum+p.amount,0);
+      const team2Total = team2People.reduce((sum,p)=>sum+p.amount,0);
       calculationHtml = `
         <div class="section-title">Kết quả tính tiền</div>
         <div class="card">
+          <div class="result-match-status ${isDraw?'draw':''}">${isDraw ? '🤝 Hòa — chia tiền 50/50' : `🏆 Đội ${match.winningTeam==='team1'?'1':'2'} thắng`}</div>
           <div class="result-calc-grid">
-            <div class="result-calc-team team-result-winner"><div class="team-block"><h3 class="winner">Đội ${winningTeam==='team1'?'1':'2'} thắng</h3>${winningLines}<div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(winningTotal)}</span></div></div></div>
-            <div class="result-calc-team"><div class="team-block"><h3>Đội ${losingTeam==='team1'?'1':'2'} thua</h3>${losingLines}<div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(losingTotal)}</span></div></div></div>
+            <div class="result-calc-team ${!isDraw && match.winningTeam==='team1'?'team-result-winner':''}"><div class="team-block"><h3 class="${!isDraw && match.winningTeam==='team1'?'winner':''}">Đội 1</h3>${team1Lines}<div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(team1Total)}</span></div></div></div>
+            <div class="result-calc-team ${!isDraw && match.winningTeam==='team2'?'team-result-winner':''}"><div class="team-block"><h3 class="${!isDraw && match.winningTeam==='team2'?'winner':''}">Đội 2</h3>${team2Lines}<div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(team2Total)}</span></div></div></div>
           </div>
           <div class="total-line"><span>Tổng đóng quỹ</span><span>${Utils.formatCurrency(totalCollected)}</span></div>
-          <div class="hint">Tiền sân: ${Utils.formatCurrency(match.fieldFee)} — tổng đóng có thể nhỉnh hơn do làm tròn lên từng người.</div>
+          <div class="hint">Tiền sân: ${Utils.formatCurrency(match.fieldFee)}${isDraw ? ' — trận hòa nên chia đều 50/50.' : ' — tổng đóng có thể nhỉnh hơn do làm tròn lên từng người.'}</div>
         </div>
         <button class="btn btn-primary btn-block" onclick="Handlers.confirmMatch('${matchId}')">✅ Xác nhận & Lưu trận</button>`;
     }
@@ -2600,7 +2611,7 @@ Views.renderMatchResultSetup = (matchId) => {
         <div style="font-weight:700;">${Utils.formatMatchDate(match.date) || ''} ${match.time || ''}</div>
         <div class="loc"><strong>Sân:</strong> ${Utils.escapeHtml(match.location || 'Chưa chọn sân')}</div>
         <div class="fee">Tiền sân: ${Utils.formatCurrency(match.fieldFee)}</div>
-        <div class="loc">Tỷ lệ ${match.ratio.losingShare}/${match.ratio.winningShare} (đội thua/đội thắng)</div>
+        <div class="loc">${isDraw ? 'Kết quả: Hòa · chia 50/50' : `Tỷ lệ ${match.ratio.losingShare}/${match.ratio.winningShare} (đội thua/đội thắng)`}</div>
       </div>
 
       <div class="section-title">Đội hình đã xác nhận</div>
@@ -2611,14 +2622,15 @@ Views.renderMatchResultSetup = (matchId) => {
 
       <div class="section-title">Kết quả trận đấu</div>
       <div class="card">
-        <div class="hint" style="margin-bottom:10px;">Chọn đội thắng. Sau đó bấm “Tính toán” để chia tiền sân.</div>
+        <div class="hint" style="margin-bottom:10px;">Chọn kết quả trận đấu. Nếu hòa, hai đội chia tiền sân 50/50.</div>
         <div class="chip-row">
-          <span class="chip ${match.winningTeam==='team1'?'active':''}" onclick="Handlers.setWinner('${matchId}','team1')">Đội 1 thắng</span>
-          <span class="chip ${match.winningTeam==='team2'?'active':''}" onclick="Handlers.setWinner('${matchId}','team2')">Đội 2 thắng</span>
+          <span class="chip ${match.winningTeam==='team1' && match.result!=='draw'?'active':''}" onclick="Handlers.setWinner('${matchId}','team1')">Đội 1 thắng</span>
+          <span class="chip ${match.winningTeam==='team2' && match.result!=='draw'?'active':''}" onclick="Handlers.setWinner('${matchId}','team2')">Đội 2 thắng</span>
+          <span class="chip ${match.result==='draw'?'active':''}" onclick="Handlers.setMatchResult('${matchId}','draw')">Hòa</span>
         </div>
       </div>
 
-      ${match.winningTeam ? `<button class="btn btn-orange-action btn-block" style="margin-top:10px;" onclick="Handlers.calculatePreview('${matchId}')">🧮 Tính toán</button>` : ''}
+      ${(match.winningTeam || match.result==='draw') ? `<button class="btn btn-orange-action btn-block" style="margin-top:10px;" onclick="Handlers.calculatePreview('${matchId}')">🧮 Tính toán</button>` : ''}
       ${calculationHtml}
 
       <button class="btn btn-outline btn-block" style="margin-top:14px;" onclick="Handlers.backToMatchForm('${matchId}')">← Quay lại chỉnh đội hình</button>
@@ -2642,14 +2654,15 @@ Views.renderMatchResult = (matchId) => {
     const g = match.guests.find(x=>x.id===p.refId);
     return ` <span class="badge badge-guest">Khách</span> <span class="guest-paid-mark ${g?.paid?'paid':'unpaid'}" style="cursor:pointer;" onclick="Handlers.toggleGuestPaidInResult('${matchId}','${p.refId}')">${g?.paid?'✓ Đã thu':'○ Chưa thu'}</span>`;
   };
+  const isDraw = match.result === 'draw';
   const winningTeam = match.winningTeam;
   const losingTeam = winningTeam === 'team1' ? 'team2' : 'team1';
-  const winningPeople = match.perPersonAmounts.filter(p=>p.team===winningTeam);
-  const losingPeople = match.perPersonAmounts.filter(p=>p.team===losingTeam);
-  const winningLines = winningPeople.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${guestTag(p)}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
-  const losingLines = losingPeople.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${guestTag(p)}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
-  const winningTotal = winningPeople.reduce((s,p)=>s+p.amount,0);
-  const losingTotal = losingPeople.reduce((s,p)=>s+p.amount,0);
+  const team1People = match.perPersonAmounts.filter(p=>p.team==='team1');
+  const team2People = match.perPersonAmounts.filter(p=>p.team==='team2');
+  const team1Lines = team1People.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${guestTag(p)}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+  const team2Lines = team2People.map(p => `<div class="person-line"><span>${Utils.escapeHtml(nameOf(p))}${guestTag(p)}</span><span>${Utils.formatCurrency(p.amount)}</span></div>`).join('');
+  const team1Total = team1People.reduce((s,p)=>s+p.amount,0);
+  const team2Total = team2People.reduce((s,p)=>s+p.amount,0);
   const total = match.perPersonAmounts.reduce((s,p)=>s+p.amount, 0);
 
   app.innerHTML = `
@@ -2659,7 +2672,7 @@ Views.renderMatchResult = (matchId) => {
         <div style="font-weight:700;">${Utils.formatMatchDate(match.date) || ''} ${match.time || ''}</div>
         <div class="loc"><strong>Sân:</strong> ${Utils.escapeHtml(match.location || 'Chưa chọn sân')}</div>
         <div class="result-fee-luxury">Tiền sân: ${Utils.formatCurrency(match.fieldFee)}</div>
-        <div class="loc">Tỷ lệ ${match.ratio.losingShare}/${match.ratio.winningShare} (đội thua/đội thắng)</div>
+        <div class="loc">${isDraw ? 'Kết quả: Hòa · chia 50/50' : `Tỷ lệ ${match.ratio.losingShare}/${match.ratio.winningShare} (đội thua/đội thắng)`}</div>
       </div>
 
       <div class="card result-final-card">
@@ -2670,16 +2683,17 @@ Views.renderMatchResult = (matchId) => {
             <div class="hint" style="margin-top:3px;">Kết quả và các khoản tiền đã được ghi nhận.</div>
           </div>
         </div>
+        <div class="result-final-match-status ${isDraw?'draw':''}">${isDraw ? '🤝 Kết quả: Hòa — chia tiền 50/50' : `🏆 Kết quả: Đội ${winningTeam==='team1'?'1':'2'} thắng`}</div>
         <div class="result-calc-grid">
-          <div class="result-calc-team team-result-winner">
-            <h3 class="winner">Đội ${winningTeam==='team1'?'1':'2'} thắng</h3>
-            ${winningLines}
-            <div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(winningTotal)}</span></div>
+          <div class="result-calc-team ${!isDraw && winningTeam==='team1'?'team-result-winner':''}">
+            <h3 class="${!isDraw && winningTeam==='team1'?'winner':''}">Đội 1</h3>
+            ${team1Lines}
+            <div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(team1Total)}</span></div>
           </div>
-          <div class="result-calc-team">
-            <h3>Đội ${losingTeam==='team1'?'1':'2'} thua</h3>
-            ${losingLines}
-            <div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(losingTotal)}</span></div>
+          <div class="result-calc-team ${!isDraw && winningTeam==='team2'?'team-result-winner':''}">
+            <h3 class="${!isDraw && winningTeam==='team2'?'winner':''}">Đội 2</h3>
+            ${team2Lines}
+            <div class="gfc-team-total"><span>Tổng đội</span><span>${Utils.formatCurrency(team2Total)}</span></div>
           </div>
         </div>
         <div class="total-line"><span>Tổng đóng quỹ</span><span>${Utils.formatCurrency(total)}</span></div>
@@ -2726,7 +2740,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.88</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.89</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2840,7 +2854,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.88</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.89</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -2936,7 +2950,7 @@ const Handlers = new Proxy({
     if(!Auth.isAdmin()) return false;
     const payload = {
       exportedAt: new Date().toISOString(),
-      appVersion: 'v1.88',
+      appVersion: 'v1.89',
       data: JSON.parse(JSON.stringify(Storage.get()))
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -3560,18 +3574,24 @@ const Handlers = new Proxy({
     if(team1.length === 0 || team2.length === 0){ Dialogs.alert('Mỗi đội phải có ít nhất 1 người tham gia.'); return; }
     if(!match.ratio){ Dialogs.alert('Vui lòng chọn kèo chia tiền sân.'); return; }
     if(!match.fieldFee || match.fieldFee <= 0){ Dialogs.alert('Vui lòng nhập tiền sân hợp lệ.'); return; }
-    MatchService.update(matchId, { setupConfirmed: true, winningTeam: null });
+    MatchService.update(matchId, { setupConfirmed: true, winningTeam: null, result: null });
     lastPreview = null;
     Snackbar.show('Đã xác nhận đội hình và kèo');
     location.hash = '#/match/' + matchId + '/result';
   },
   backToMatchForm(matchId){
-    MatchService.update(matchId, { setupConfirmed: false, winningTeam: null });
+    MatchService.update(matchId, { setupConfirmed: false, winningTeam: null, result: null });
     lastPreview = null;
     location.hash = '#/match/' + matchId + '/edit';
   },
   setWinner(matchId, team){
-    MatchService.update(matchId, { winningTeam: team });
+    MatchService.update(matchId, { winningTeam: team, result: null });
+    lastPreview = null;
+    Views.renderMatchResultSetup(matchId);
+  },
+  setMatchResult(matchId, result){
+    if(result !== 'draw') return;
+    MatchService.update(matchId, { winningTeam: null, result: 'draw' });
     lastPreview = null;
     Views.renderMatchResultSetup(matchId);
   },
@@ -3655,7 +3675,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.88</strong>
+          <strong>v1.89</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
