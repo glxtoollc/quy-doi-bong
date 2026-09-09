@@ -1392,7 +1392,9 @@ const Storage = (() => {
       id:t.id||Utils.genId(), type:t.type==='expense'?'expense':'income',
       amount:Math.round(Number(t.amount)||0), reason:String(t.reason||'').trim(),
       category:t.category||'other', source:t.source||null,
-      sourcePenaltyTxId:t.sourcePenaltyTxId||null, memberId:t.memberId||null,
+      sourcePenaltyTxId:t.sourcePenaltyTxId||null, sourceMemberTxId:t.sourceMemberTxId||null,
+      sourceGuestPaymentId:t.sourceGuestPaymentId||null, guestId:t.guestId||null,
+      matchId:t.matchId||null, transferId:t.transferId||null, memberId:t.memberId||null,
       penaltyKey:t.penaltyKey||null, createdAt:t.createdAt||new Date().toISOString()
     })).filter(t=>t.amount!==0 && t.reason) : [];
     const migrated=Array.isArray(src.migratedPenaltyIds)?[...src.migratedPenaltyIds]:[];
@@ -1675,6 +1677,59 @@ const TeamFundService = {
     const s=Storage.get(); this.ensure();
     const tx={id:Utils.genId(),type:'expense',amount:-value,reason:String(reason).trim(),category,createdAt:new Date().toISOString()};
     s.teamFund.transactions.push(tx); this.recalculate(); Storage.save(); return tx;
+  },
+  syncGuestPayment(match, guestId, save=true){
+    if(!Auth.isAdmin()) return false;
+    if(!match || !guestId) return false;
+    const state=Storage.get(); this.ensure();
+    const guest=match.guests?.find(g=>g.id===guestId);
+    if(!guest) return false;
+    const existing=state.teamFund.transactions.filter(t=>t.sourceGuestPaymentId===`${match.id}:${guestId}`);
+    if(!guest.paid){
+      if(existing.length){
+        const ids=new Set(existing.map(t=>t.id));
+        state.teamFund.transactions=state.teamFund.transactions.filter(t=>!ids.has(t.id));
+        this.recalculate();
+        if(save) Storage.save();
+      }
+      return true;
+    }
+    const amount=Number((match.perPersonAmounts||[]).find(p=>p.refType==='guest' && p.refId===guestId)?.amount||0);
+    if(amount<=0) return false;
+    if(!existing.length){
+      state.teamFund.transactions.push({
+        id:Utils.genId(), type:'income', amount:Math.round(amount),
+        reason:`Khách ${guest.name} — đóng tiền trận đấu`,
+        category:'guest', source:'guest_payment', sourceGuestPaymentId:`${match.id}:${guestId}`,
+        guestId, matchId:match.id, createdAt:new Date().toISOString()
+      });
+      this.recalculate();
+      if(save) Storage.save();
+    }
+    return true;
+  },
+  syncAllGuestPayments(save=true){
+    if(!Auth.isAdmin()) return false;
+    const state=Storage.get(); this.ensure();
+    let changed=false;
+    const validKeys=new Set();
+    (state.matches||[]).filter(m=>m.status===MatchStatus.COMPLETED).forEach(match=>{
+      (match.guests||[]).filter(g=>g.paid).forEach(guest=>{
+        const key=`${match.id}:${guest.id}`; validKeys.add(key);
+        const amount=Number((match.perPersonAmounts||[]).find(p=>p.refType==='guest' && p.refId===guest.id)?.amount||0);
+        if(amount<=0) return;
+        if(!state.teamFund.transactions.some(t=>t.sourceGuestPaymentId===key)){
+          state.teamFund.transactions.push({id:Utils.genId(),type:'income',amount:Math.round(amount),reason:`Khách ${guest.name} — đóng tiền trận đấu`,category:'guest',source:'guest_payment',sourceGuestPaymentId:key,guestId:guest.id,matchId:match.id,createdAt:match.updatedAt||new Date().toISOString()});
+          changed=true;
+        }
+      });
+    });
+    const before=state.teamFund.transactions.length;
+    state.teamFund.transactions=state.teamFund.transactions.filter(t=>!t.sourceGuestPaymentId || validKeys.has(t.sourceGuestPaymentId));
+    if(state.teamFund.transactions.length!==before) changed=true;
+    this.recalculate();
+    if(changed && save) Storage.save();
+    return changed;
   },
   removeLinkedPenalty(penaltyTxId,save=true){
     const s=Storage.get(); this.ensure();
@@ -1983,6 +2038,7 @@ const MatchService = {
     savedMatch.perPersonAmounts = perPersonAmounts;
     savedMatch.status = MatchStatus.COMPLETED;
     savedMatch.updatedAt = new Date().toISOString();
+    TeamFundService.syncAllGuestPayments(false);
     if(!Storage.save()) return { ok:false, errors:['Không thể lưu trạng thái trận đấu'] };
     return { ok:true };
   },
@@ -2149,6 +2205,7 @@ const CLUB_LOGO_SVG = `
 /* ---- 0. TRANG CHỦ ---- */
 Views.renderHome = () => {
   const app = document.getElementById('app');
+  if(Auth.isAdmin()) TeamFundService.syncAllGuestPayments(true);
   const members = Utils.sortMembersByLastName(MemberService.list());
   const settings = Storage.get().settings;
   const balances = members.map(m => ({ member:m, balance:TransactionService.balanceOf(m.id) }));
@@ -2224,7 +2281,7 @@ Views.renderHome = () => {
         <div class="gfc-fund-head"><span class="gfc-fund-icon">🏆</span><span class="gfc-fund-label">QUỸ ĐỘI BÓNG</span></div>
         <div class="gfc-fund-caption">Tiền phạt và các khoản thu/chi chung của đội</div>
         <div class="gfc-fund-value fund-positive">${Utils.formatCurrency(TeamFundService.balance())}</div>
-        <div class="team-fund-v181-meta">${(() => { const tf=TeamFundService.ensure(); const inc=tf.transactions.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0); const exp=tf.transactions.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(t.amount),0); return `Thu ${Utils.formatCurrency(inc)} · Chi ${Utils.formatCurrency(exp)}`; })()}</div>
+        <div class="team-fund-v181-meta">${(() => { const tf=TeamFundService.ensure(); const inc=tf.transactions.filter(t=>t.amount>0).reduce((s,t)=>s+Number(t.amount||0),0); const exp=tf.transactions.filter(t=>t.amount<0).reduce((s,t)=>s+Math.abs(Number(t.amount||0)),0); return `Tổng thu ${Utils.formatCurrency(inc)} · Tổng chi ${Utils.formatCurrency(exp)}`; })()}</div>
         <div class="team-fund-v181-actions">
           <button class="btn btn-outline" onclick="Handlers.viewTeamFund()">Xem lịch sử</button>
           ${Auth.isAdmin()?`<button class="btn btn-primary" onclick="Handlers.manageTeamFund()">Quản lý quỹ</button>`:''}
@@ -2740,7 +2797,7 @@ Views.renderAbout = () => {
       <div class="gfc-about-hero">${CLUB_LOGO_SVG}<div class="gfc-about-name">Galaxy Football Club</div><div class="gfc-about-desc">Ứng dụng quản lý quỹ đội bóng</div></div>
       <div class="card">
         <div class="gfc-page-title"><span class="ico">i</span> Thông tin ứng dụng</div>
-        <div class="gfc-about-row"><span>Version</span><strong>v1.89</strong></div>
+        <div class="gfc-about-row"><span>Version</span><strong>v1.90</strong></div>
         <div class="gfc-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
       </div>
       <div class="card" style="text-align:center;color:#AFC1D7;line-height:1.7;"><strong style="color:#fff;">Đoàn kết · Fair Play · Chiến thắng</strong><br>Quản lý quỹ rõ ràng để tập trung vào những trận đấu.</div>
@@ -2854,7 +2911,7 @@ Views.renderSettings = () => {
           </div>
         </div>
         <div class="settings-about-rows">
-          <div class="settings-about-row"><span>Version</span><strong>v1.89</strong></div>
+          <div class="settings-about-row"><span>Version</span><strong>v1.90</strong></div>
           <div class="settings-about-row"><span>Developed by</span><strong>Trọng Hiếu</strong></div>
         </div>
       </div>
@@ -2950,7 +3007,7 @@ const Handlers = new Proxy({
     if(!Auth.isAdmin()) return false;
     const payload = {
       exportedAt: new Date().toISOString(),
-      appVersion: 'v1.89',
+      appVersion: 'v1.90',
       data: JSON.parse(JSON.stringify(Storage.get()))
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -3115,6 +3172,7 @@ const Handlers = new Proxy({
     }, true);
   },
   viewTeamFund(){
+    if(Auth.isAdmin()) TeamFundService.syncAllGuestPayments(true);
     const tf=TeamFundService.ensure();
     const income=tf.transactions.filter(t=>Number(t.amount)>0).reduce((s,t)=>s+Number(t.amount),0);
     const expense=tf.transactions.filter(t=>Number(t.amount)<0).reduce((s,t)=>s+Math.abs(Number(t.amount)),0);
@@ -3123,6 +3181,7 @@ const Handlers = new Proxy({
       let source = '';
       if(t.sourceMemberTxId || t.source==='member_transfer') source = `Từ quỹ cá nhân của <strong>${Utils.escapeHtml(member?.name || 'thành viên')}</strong>`;
       else if(t.sourcePenaltyTxId || t.source==='penalty') source = `Tiền phạt của <strong>${Utils.escapeHtml(member?.name || 'thành viên')}</strong>`;
+      else if(t.sourceGuestPaymentId || t.source==='guest_payment') source = `Tiền khách <strong>${Utils.escapeHtml((t.reason||'').replace(/ — đóng tiền trận đấu$/,'').replace(/^Khách /,'') || 'khách')}</strong> đã đóng`;
       else if(t.source==='admin_income') source = 'Khoản thu do quản trị viên nhập';
       else if(t.type==='expense') source = 'Chi từ quỹ đội bóng';
       return `<div class="tf-row"><div class="tf-detail"><strong>${Utils.escapeHtml(t.reason||'Giao dịch quỹ')}</strong>${source?`<div class="tf-source">${source}</div>`:''}<div class="hint">${Utils.formatDateTime(t.createdAt)}</div>${t.note?`<div class="tf-note">${Utils.escapeHtml(t.note)}</div>`:''}</div><span class="${t.amount>=0?'plus':'minus'}">${t.amount>=0?'+':'−'}${Utils.formatCurrency(Math.abs(t.amount))}</span></div>`;
@@ -3533,14 +3592,20 @@ const Handlers = new Proxy({
   },
   toggleGuestPaidInForm(matchId, guestId){
     const match = MatchService.get(matchId);
-    const guest = match.guests.find(g => g.id === guestId);
-    MatchService.setGuestPaid(matchId, guestId, !guest.paid);
+    const guest = match?.guests.find(g => g.id === guestId);
+    if(!match || !guest) return;
+    const paid=!guest.paid;
+    MatchService.setGuestPaid(matchId, guestId, paid);
+    if(match.status===MatchStatus.COMPLETED) TeamFundService.syncGuestPayment(match, guestId, true);
     Views.renderMatchForm(matchId);
   },
   toggleGuestPaidInResult(matchId, guestId){
     const match = MatchService.get(matchId);
-    const guest = match.guests.find(g => g.id === guestId);
-    MatchService.setGuestPaid(matchId, guestId, !guest.paid);
+    const guest = match?.guests.find(g => g.id === guestId);
+    if(!match || !guest) return;
+    const paid=!guest.paid;
+    MatchService.setGuestPaid(matchId, guestId, paid);
+    if(match.status===MatchStatus.COMPLETED) TeamFundService.syncGuestPayment(match, guestId, true);
     Views.renderMatchResult(matchId);
   },
   setTeam(matchId, refType, refId, team){
@@ -3675,7 +3740,7 @@ const Handlers = new Proxy({
       <div style="font-size:14px; line-height:1.8;">
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0; border-bottom:1px solid #EEE;">
           <span style="color:var(--text-sub);">Version</span>
-          <strong>v1.89</strong>
+          <strong>v1.90</strong>
         </div>
         <div style="display:flex; justify-content:space-between; gap:20px; padding:7px 0;">
           <span style="color:var(--text-sub);">Developed by</span>
